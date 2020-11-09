@@ -1,0 +1,18 @@
+{
+	"development": {
+		"DiscordClient": {
+			"autoReconnect": true,
+			"presence":{
+				"status":"Greeting People",
+				"afk":false,
+				"activity":{}
+			}
+		},
+		"Token": "",
+		"version": [1,0,65],
+		"config_id": "development"
+	},
+	"production": {
+		"config_id": "production"
+	}
+}

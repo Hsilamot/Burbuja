@@ -1,9 +1,12 @@
 const fs = require('fs');
+const configjson = require('./config.json');
+const environment = process.env.NODE_ENV || 'development';
+const config = Object.assign(configjson['development'], configjson[environment]); ;
 const util = require('util');
 const Discord = require('discord.js');
 const discordTTS = require('discord-tts');
 
-const client = new Discord.Client({autoReconnect:true,retryLimit:Infinity});
+const client = new Discord.Client(config.DiscordClient);
 const { OpusEncoder } = require('@discordjs/opus');
 const ObservableSlim = require('observable-slim');
 
@@ -285,4 +288,4 @@ process.on('SIGINT',async () => {
 
 console.log('Start...'); 
 
-client.login('NzI0MjE4NzI2MTkwNDE1OTAy.Xu8_WQ.4AyQKAbuG6TEGd_ku9527KjqCyY').catch(error => {console.error; console.log('reconnect'); connect(client)});
+client.login(config.Token).catch(error => {console.error; console.log('reconnect');});
