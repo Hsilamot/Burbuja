@@ -56,44 +56,102 @@ let current = null;
 var guild_voice = {};
 var guild_voice_status = {};
 
-async function joinChannel(guildID,channelID) {
+async function joinChannel(guildID,channel) {
 	if (guild_voice[guildID]!==null) {
 		//console.log('There is a voice presence');
 	}
-	await client.channels.fetch(channelID).then(async function (channel) {
-		//console.log('Requesting join to '+channel.id);
-		await channel.join().then(async (voz) => {
-			//console.log('joined '+voz.channel.id);
-			if (guild_voice[guildID]===null) {
-				voz.on('disconnect',connection => {
-					guild_voice[guildID] = null;
-					guild_voice_status[guildID] = false;
-				});
-				voz.on('error', () => {console.error});
-			}
-			guild_voice[guildID] = voz;
-			guild_voice_status[guildID] = false;
-			return true;
-		}).catch(console.error);
-	});
+	//console.log('Requesting join to '+channel.id);
+	await channel.join().then(async (voz) => {
+		//console.log('joined '+voz.channel.id);
+		if (guild_voice[guildID]===null) {
+			voz.on('disconnect',connection => {
+				guild_voice[guildID] = null;
+				guild_voice_status[guildID] = false;
+			});
+			voz.on('error', () => {console.error});
+		}
+		guild_voice[guildID] = voz;
+		guild_voice_status[guildID] = false;
+		return true;
+	}).catch(console.error);
 }
 
 async function notifyChannel(guild,channel,member,joined) {
 	if (
-		guild_voice[newState.guild.id]===null
-		&&newState.channelID!==null
-		&&guild_voice_status[newState.guild.id]==false
+		guild_voice[guild.id]===null
+		&&guild_voice_status[guild.id]==false
 	) {
-		guild_voice_status[newState.guild.id] = true;
-		await joinChannel(newState.guild.id,newState.channelID);
+		guild_voice_status[guild.id] = true;
+		await joinChannel(guild.id,channel);
 	} else if (
-		guild_voice[newState.guild.id]!==null
-		&&newState.channelID!==null
-		&&newState.channelID!==guild_voice[newState.guild.id].channel.id
-		&&guild_voice_status[newState.guild.id]==false
+		guild_voice[guild.id]!==null
+		&&channel.id!==guild_voice[guild.id].channel.id
+		&&guild_voice_status[guild.id]==false
 	) {
-		guild_voice_status[newState.guild.id] = true;
-		await joinChannel(newState.guild.id,newState.channelID);
+		guild_voice_status[guild.id] = true;
+		await joinChannel(guild.id,channel);
+	}
+	var nickname = member.nickname;
+	if (nickname===null) {
+		nickname = member.user.username;
+	}
+	if (joined) {
+		console.log('['+guild.name+']'+nickname+' se ha unido al canal... Diciendo "Hola!"...');
+		var sonido = '';
+		switch (member.user.id) {
+			case '436724739868721153': //Zeus
+				sonido = './sounds/join_zeus.ogg'; break;
+			case '538464306539528192': //NikoSan
+				sonido = './sounds/join_niko.ogg'; break;
+			case '358776832536870913': //Taquero
+				sonido = './sounds/join_taquero.ogg'; break;
+			case '468956439528996864': //Dayreff
+				sonido = './sounds/join_dayreff.ogg'; break;
+			case '329392035658465281': //Draxen
+				switch (Math.floor(Math.random() * Math.floor(2))) {
+					case  0: sonido = './sounds/join_draxen.ogg'; break;
+					case  1: sonido = './sounds/join_draxen2.ogg'; break;
+				}
+				break;
+			case '279786562089254912': //Liontzuky
+				switch (Math.floor(Math.random() * Math.floor(2))) {
+					case  0: sonido = './sounds/join_liontzuky.ogg'; break;
+					case  1: sonido = './sounds/join_liontzuky2.ogg'; break;
+				}
+				break;
+			default:
+				sonido = './sounds/join_default.ogg';
+		}
+		await new Promise((resolve,reject) => {
+			setTimeout(() => {
+				guild_voice[guild.id].play(sonido);
+				setTimeout(() => {
+					resolve('Played!');
+				},1500);
+			}, 750)
+		}).catch( async (error) => {console.log(error); });
+		//await new Promise(resolve => setTimeout(() => guild_voice[guild.id].play(sonido), 750)).catch( async (error) => {console.log(error); });
+	} else {
+		console.log('['+guild.name+']'+nickname+' ha abandonado el canal... Diciendo "Adiós!"...');
+		var sonido = '';
+		switch (member.user.id) {
+			case '468956439528996864': //Dayreff
+				sonido = './sounds/leave_dayreff.ogg'; break;
+			case '436724739868721153': //Zeus
+			case '538464306539528192': //NikoSan
+			case '358776832536870913': //Taquero
+			default:
+				sonido = './sounds/leave_default.ogg';
+		}
+		await new Promise((resolve,reject) => {
+			setTimeout(() => {
+				guild_voice[guild.id].play(sonido);
+				setTimeout(() => {
+					resolve('Played!');
+				},1500);
+			}, 750)
+		}).catch( async (error) => {console.log(error); });
+		//await new Promise(resolve => setTimeout(() => guild_voice[guild.id].play(sonido), 750)).catch( async (error) => {console.log(error); });
 	}
 }
 
@@ -128,14 +186,28 @@ client.on('voiceStateUpdate', async (oldState, newState) => {
 		//estamos apagados no hay que hacer nada
 		return false;
 	}
-	if (newState!==null) {
+	if (oldState!==null) {
+		//Habia un estado previo
+		if (oldState.id==client.user.id) { //el viejo estado involucra a este bot
+			//No hacemos nada cuando somos nosotros
+		} else {
+			if (newState===null||oldState.channelID!=newState.channelID) {
+				// User leaves a voice channel // user changes voice chanel
+				await client.channels.fetch(oldState.channelID).then(async function (channel) {
+					var member = await oldState.guild.members.fetch(oldState.id).catch( async (error) => {console.error; });
+					await notifyChannel(oldState.guild,channel,member,false);
+				}).catch( async (error) => {console.error; });
+			}
+		}
+	}
+	if (newState!==null) { //posible usuario entrando a un canal
 		if (newState.id==client.user.id) { //el nuevo estado involucra a este Bot
 			if (newState.channelID===null) { //El nuevo estado significa que estamos desconectados
 				guild_voice[newState.guild.id] = null; //Ponemos como nulo nuestro handler
 				guild_voice_status[newState.guild.id] = false; //status es falso
 			}
 		} else {
-			if (oldState!==null) {
+			if (oldState!==null) { //existia un estado previo
 				if (oldState.channelID==newState.channelID) {
 					//el usuario no cambio de canal, nos quedamos calladitos y no hacemos nada
 					return false;
@@ -143,69 +215,8 @@ client.on('voiceStateUpdate', async (oldState, newState) => {
 			}
 			await client.channels.fetch(newState.channelID).then(async function (channel) {
 				var member = await newState.guild.members.fetch(newState.id).catch( async (error) => {console.error; });
-				notifyChannel(newState.guild,channel,member,true);
-			});
-			if (guild_voice[newState.guild.id]!==null&&newState.channelID==guild_voice[newState.guild.id].channel.id) {
-				// User Joins a voice channel
-
-
-
-				var nickname = newState.guild.members.cache.get(newState.id).nickname;
-				if (nickname===null) {
-					nickname = newState.guild.members.cache.get(newState.id).user.username;
-				}
-				console.log('['+newState.guild.name+']'+nickname+' se ha unido al canal... Diciendo "Hola!"...');
-				var sonido = '';
-				switch (newState.id) {
-					case '436724739868721153': //Zeus
-						sonido = './sounds/join_zeus.ogg'; break;
-					case '538464306539528192': //NikoSan
-						sonido = './sounds/join_niko.ogg'; break;
-					case '358776832536870913': //Taquero
-						sonido = './sounds/join_taquero.ogg'; break;
-					case '468956439528996864': //Dayreff
-						sonido = './sounds/join_dayreff.ogg'; break;
-					case '329392035658465281': //Draxen
-						switch (Math.floor(Math.random() * Math.floor(2))) {
-							case  0: sonido = './sounds/join_draxen.ogg'; break;
-							case  1: sonido = './sounds/join_draxen2.ogg'; break;
-						}
-						break;
-					case '279786562089254912': //Liontzuky
-						switch (Math.floor(Math.random() * Math.floor(2))) {
-							case  0: sonido = './sounds/join_liontzuky.ogg'; break;
-							case  1: sonido = './sounds/join_liontzuky2.ogg'; break;
-						}
-						break;
-					default:
-						sonido = './sounds/join_default.ogg';
-				}
-				setTimeout(() => guild_voice[newState.guild.id].play(sonido), 750);
-			}
-		}
-	}
-	if (oldState!==null) {
-		//El anterior estado tiene que no ser nulo pues debería haber estado conectado a casual antes
-		if (guild_voice[newState.guild.id]!==null&&oldState.channelID==guild_voice[newState.guild.id].channel.id) { //Es el canal en el que esta el bot
-			if (newState===null||newState.channelID!=guild_voice[newState.guild.id].channel.id) {
-				// User leaves a voice channel
-				var nickname = oldState.guild.members.cache.get(oldState.id).nickname;
-				if (nickname===null) {
-					nickname = oldState.guild.members.cache.get(oldState.id).user.username;
-				}
-				console.log('['+newState.guild.name+']'+nickname+' ha abandonado el canal... Diciendo "Adiós!"...');
-				var sonido = '';
-				switch (newState.id) {
-					case '468956439528996864': //Dayreff
-						sonido = './sounds/leave_dayreff.ogg'; break;
-					case '436724739868721153': //Zeus
-					case '538464306539528192': //NikoSan
-					case '358776832536870913': //Taquero
-					default:
-						sonido = './sounds/leave_default.ogg';
-				}
-				setTimeout(() => guild_voice[newState.guild.id].play(sonido), 750);
-			}
+				await notifyChannel(newState.guild,channel,member,true);
+			}).catch( async (error) => {console.error; });
 		}
 	}
 });
@@ -279,7 +290,6 @@ process.on('SIGINT',async () => {
 		console.log('GuildID '+guildID);
 		if (voz!==null) {
 			console.log('Requesting voice disconnect.');
-			console.log(voz);
 			await voz.disconnect();
 		}
 	};
@@ -288,4 +298,4 @@ process.on('SIGINT',async () => {
 
 console.log('Start...'); 
 
-client.login(config.Token).catch(error => {console.error; console.log('reconnect');});
+client.login(config.Token).catch(error => {console.log(error); console.log('reconnect');});
