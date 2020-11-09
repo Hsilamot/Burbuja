@@ -1,0 +1,9 @@
+{
+  "dependencies": {
+    "@discordjs/opus": "github:discordjs/opus",
+    "discord-tts": "^1.0.1",
+    "discord.js": "^12.2.0",
+    "ffmpeg": "0.0.4",
+    "observable-slim": "^0.1.5"
+  }
+}
