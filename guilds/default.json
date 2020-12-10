@@ -1,1 +1,5 @@
-{"prefix":"!","enabled":true}
+{
+	"prefix":"!",
+	"enabled":true,
+	"hasTTSuntil":0
+}
