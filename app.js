@@ -107,6 +107,10 @@ async function notifyChannel(guild,channel,member,joined) {
 				sonido = './sounds/join_taquero.ogg'; break;
 			case '468956439528996864': //Dayreff
 				sonido = './sounds/join_dayreff.ogg'; break;
+			case '285061921453899776': //Elma
+				sonido = './sounds/join_elma.ogg'; break;
+			case '402277903372517397': //Personalizado
+				sonido = './sounds/join_402277903372517397_wahaha.ogg'; break;
 			case '329392035658465281': //Draxen
 				switch (Math.floor(Math.random() * Math.floor(2))) {
 					case  0: sonido = './sounds/join_draxen.ogg'; break;
@@ -114,20 +118,28 @@ async function notifyChannel(guild,channel,member,joined) {
 				}
 				break;
 			case '279786562089254912': //Liontzuky
-				switch (Math.floor(Math.random() * Math.floor(2))) {
+				switch (Math.floor(Math.random() * Math.floor(4))) {
 					case  0: sonido = './sounds/join_liontzuky.ogg'; break;
 					case  1: sonido = './sounds/join_liontzuky2.ogg'; break;
+					case  2: sonido = './sounds/join_liontzuky3.ogg'; break;
+					case  3: sonido = './sounds/join_liontzuky4.ogg'; break;
 				}
 				break;
+			case '475796286067572766': //Crimson
+				sonido = './sounds/join_liontzuky3.ogg'; break;
 			default:
 				sonido = './sounds/join_default.ogg';
 		}
 		await new Promise((resolve,reject) => {
 			setTimeout(() => {
-				guild_voice[guild.id].play(sonido);
-				setTimeout(() => {
-					resolve('Played!');
-				},1500);
+				if (typeof guild_voice[guild.id]==='object'&&guild_voice[guild.id]!==null) {
+					guild_voice[guild.id].play(sonido);
+					setTimeout(() => {
+						resolve('Played!');
+					},1500);
+				} else {
+					reject('No object on voice!');
+				}
 			}, 750)
 		}).catch( async (error) => {console.log(error); });
 		//await new Promise(resolve => setTimeout(() => guild_voice[guild.id].play(sonido), 750)).catch( async (error) => {console.log(error); });
@@ -145,10 +157,14 @@ async function notifyChannel(guild,channel,member,joined) {
 		}
 		await new Promise((resolve,reject) => {
 			setTimeout(() => {
-				guild_voice[guild.id].play(sonido);
-				setTimeout(() => {
-					resolve('Played!');
-				},1500);
+				if (typeof guild_voice[guild.id]==='object'&&guild_voice[guild.id]!==null) {
+					guild_voice[guild.id].play(sonido);
+					setTimeout(() => {
+						resolve('Played!');
+					},1500);
+				} else {
+					reject('No object on voice!');
+				}
 			}, 750)
 		}).catch( async (error) => {console.log(error); });
 		//await new Promise(resolve => setTimeout(() => guild_voice[guild.id].play(sonido), 750)).catch( async (error) => {console.log(error); });
