@@ -1,10 +1,12 @@
 const fs = require('fs');
 const configjson = require('./config.json');
 const environment = process.env.NODE_ENV || 'development';
-const config = Object.assign(configjson['development'], configjson[environment]); ;
+const config = Object.assign(configjson['development'], configjson[environment]);
 const util = require('util');
+var crypto = require('crypto');
 const Discord = require('discord.js');
 const discordTTS = require('discord-tts');
+const GoogleCloudTextToSpeech = require('@google-cloud/text-to-speech');
 
 const client = new Discord.Client(config.DiscordClient);
 const { OpusEncoder } = require('@discordjs/opus');
@@ -36,6 +38,34 @@ var guilds = ObservableSlim.create(guilds_data, true, function(changes) {
 		}
 	})
 });
+
+const googleTTS = new GoogleCloudTextToSpeech.TextToSpeechClient(config.GoogleTTS);
+
+async function GeneraVoz(textoaconvertir) {
+	const request = Object.assign(config.GoogleTTS.templateObject,
+						{
+							"input": {
+								"text": textoaconvertir
+							}
+						}
+					);
+	var hashSha512 = crypto.createHash('sha512');
+	hashraw = hashSha512.update(textoaconvertir, 'utf-8');
+	sha512hash = hashraw.digest('hex');
+	try {
+		if (fs.existsSync('voice_cache/'+sha512hash+'.ogg')) {
+			return 'voice_cache/'+sha512hash+'.ogg';
+		} else {
+			const [response] = await googleTTS.synthesizeSpeech(request);
+			const writeFile = util.promisify(fs.writeFile);
+			await writeFile('voice_cache/'+sha512hash+'.ogg', response.audioContent, 'binary');
+			console.log('Generado archivo de cache para la frase "'+textoaconvertir+'" --> voice_cache/'+sha512hash+'.ogg');
+			return 'voice_cache/'+sha512hash+'.ogg';
+		}
+	} catch(err) {
+		console.log(err);
+	}
+}
 
 function quickBotReply(message,text,...params) {
 	var sendText = text;
@@ -107,6 +137,10 @@ async function notifyChannel(guild,channel,member,joined) {
 				sonido = './sounds/join_taquero.ogg'; break;
 			case '468956439528996864': //Dayreff
 				sonido = './sounds/join_dayreff.ogg'; break;
+			case '285061921453899776': //Elma
+				sonido = './sounds/join_elma.ogg'; break;
+			case '402277903372517397': //Personalizado
+				sonido = './sounds/join_402277903372517397_wahaha.ogg'; break;
 			case '329392035658465281': //Draxen
 				switch (Math.floor(Math.random() * Math.floor(2))) {
 					case  0: sonido = './sounds/join_draxen.ogg'; break;
@@ -114,20 +148,28 @@ async function notifyChannel(guild,channel,member,joined) {
 				}
 				break;
 			case '279786562089254912': //Liontzuky
-				switch (Math.floor(Math.random() * Math.floor(2))) {
+				switch (Math.floor(Math.random() * Math.floor(4))) {
 					case  0: sonido = './sounds/join_liontzuky.ogg'; break;
 					case  1: sonido = './sounds/join_liontzuky2.ogg'; break;
+					case  2: sonido = './sounds/join_liontzuky3.ogg'; break;
+					case  3: sonido = './sounds/join_liontzuky4.ogg'; break;
 				}
 				break;
+			case '475796286067572766': //Crimson
+				sonido = './sounds/join_liontzuky3.ogg'; break;
 			default:
 				sonido = './sounds/join_default.ogg';
 		}
 		await new Promise((resolve,reject) => {
 			setTimeout(() => {
-				guild_voice[guild.id].play(sonido);
-				setTimeout(() => {
-					resolve('Played!');
-				},1500);
+				if (typeof guild_voice[guild.id]==='object'&&guild_voice[guild.id]!==null) {
+					guild_voice[guild.id].play(sonido);
+					setTimeout(() => {
+						resolve('Played!');
+					},1500);
+				} else {
+					reject('No object on voice!');
+				}
 			}, 750)
 		}).catch( async (error) => {console.log(error); });
 		//await new Promise(resolve => setTimeout(() => guild_voice[guild.id].play(sonido), 750)).catch( async (error) => {console.log(error); });
@@ -145,10 +187,14 @@ async function notifyChannel(guild,channel,member,joined) {
 		}
 		await new Promise((resolve,reject) => {
 			setTimeout(() => {
-				guild_voice[guild.id].play(sonido);
-				setTimeout(() => {
-					resolve('Played!');
-				},1500);
+				if (typeof guild_voice[guild.id]==='object'&&guild_voice[guild.id]!==null) {
+					guild_voice[guild.id].play(sonido);
+					setTimeout(() => {
+						resolve('Played!');
+					},1500);
+				} else {
+					reject('No object on voice!');
+				}
 			}, 750)
 		}).catch( async (error) => {console.log(error); });
 		//await new Promise(resolve => setTimeout(() => guild_voice[guild.id].play(sonido), 750)).catch( async (error) => {console.log(error); });
@@ -157,8 +203,10 @@ async function notifyChannel(guild,channel,member,joined) {
 
 client.on('guildCreate', guild => {
 	console.log('Me he unido a ' + guild.name);
+	const defaultGuildConfig = require('./guilds/default.json');
 	if (fs.existsSync('./guilds/'+guild.id+'.json')) {
-		guilds_data[guild.id] = require('./guilds/'+guild.id+'.json');
+		guilds_data[guild.id] = Object.assign({}, defaultGuildConfig);
+		guilds_data[guild.id] = Object.assign(guilds_data[guild.id], require('./guilds/'+guild.id+'.json'));
 	} else {
 		guilds_data[guild.id] = require('./guilds/default.json');
 	}
@@ -171,9 +219,11 @@ client.on('error', () => {console.error});
 client.on('ready', () => {
 	console.log(`Logged in as ${client.user.tag}!`);
 	console.log('Retrieving guilds...');
+	const defaultGuildConfig = require('./guilds/default.json');
 	client.guilds.cache.forEach((guild) => {
 		if (fs.existsSync('./guilds/'+guild.id+'.json')) {
-			guilds_data[guild.id] = require('./guilds/'+guild.id+'.json');
+			guilds_data[guild.id] = Object.assign({}, defaultGuildConfig);
+			guilds_data[guild.id] = Object.assign(guilds_data[guild.id], require('./guilds/'+guild.id+'.json'));
 		} else {
 			guilds_data[guild.id] = require('./guilds/default.json');
 		}
@@ -220,7 +270,7 @@ client.on('voiceStateUpdate', async (oldState, newState) => {
 		}
 	}
 });
-client.on('message', message => {
+client.on('message', async message => {
 	if (!message.guild) return;
 	// command processing
 	procesar = message.content.split(' ');
@@ -243,6 +293,19 @@ client.on('message', message => {
 				const textohablado = discordTTS.getVoiceStream(parameter,'es-US');
 				quickBotReply(message,'Ok %s!','<@'+message.author.id+'>');
 				guild_voice[message.guild.id].play(textohablado);
+			} else {
+				quickBotReply(message,'Necesito estar en un canal %s!','<@'+message.author.id+'>');
+			}
+			break;
+		case guilds[message.guild.id].prefix+'dipremium':
+			if (guild_voice[message.guild.id]!==null) {
+				if (guilds[message.guild.id].hasTTSuntil>Math.floor(new Date().getTime() / 1000)) {
+					const playFile = await GeneraVoz(parameter);
+					quickBotReply(message,'Ok %s!','<@'+message.author.id+'>');
+					guild_voice[message.guild.id].play(playFile);
+				} else {
+					quickBotReply(message,'Es necesario tener el privilegio premium para este servidor %s!','<@'+message.author.id+'>');
+				}
 			} else {
 				quickBotReply(message,'Necesito estar en un canal %s!','<@'+message.author.id+'>');
 			}
