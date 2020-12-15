@@ -1,4 +1,6 @@
 # See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+#los siguientes comandos al hacer el primer clone:
+#git update-index --assume-unchanged ./config.json
 
 # dependencies
 /node_modules

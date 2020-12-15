@@ -7,21 +7,10 @@ var crypto = require('crypto');
 const Discord = require('discord.js');
 const discordTTS = require('discord-tts');
 const GoogleCloudTextToSpeech = require('@google-cloud/text-to-speech');
-const { OpusEncoder } = require('@discordjs/opus');
 const ObservableSlim = require('observable-slim');
 const { getAudioDurationInSeconds } = require('get-audio-duration');
 const client = new Discord.Client(config.DiscordClient);
-
-const filterAdmins = (role) => {
-	switch (role.id) {
-		case '385651272331558914': return true;
-		case '425098664915238923': return true;
-		case '496439911117881365': return true;
-		case '603787160755372032': return true;
-		case '529088098999730206': return true;
-	}
-	return false;
-}
+var touch = require("touch")
 
 var guilds_data = {};
 var guilds = ObservableSlim.create(guilds_data, true, function(changes) {
@@ -54,6 +43,7 @@ async function GeneraVoz(textoaconvertir) {
 	sha512hash = hashraw.digest('hex');
 	try {
 		if (fs.existsSync('voice_cache/'+sha512hash+'.ogg')) {
+			touch('voice_cache/'+sha512hash+'.ogg');
 			return 'voice_cache/'+sha512hash+'.ogg';
 		} else {
 			const [response] = await googleTTS.synthesizeSpeech(request);
