@@ -5,6 +5,7 @@
     "discord-tts": "^1.0.1",
     "discord.js": "^12.2.0",
     "ffmpeg": "0.0.4",
+    "get-audio-duration": "^2.0.3",
     "observable-slim": "^0.1.5"
   }
 }

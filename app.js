@@ -7,10 +7,10 @@ var crypto = require('crypto');
 const Discord = require('discord.js');
 const discordTTS = require('discord-tts');
 const GoogleCloudTextToSpeech = require('@google-cloud/text-to-speech');
-
-const client = new Discord.Client(config.DiscordClient);
 const { OpusEncoder } = require('@discordjs/opus');
 const ObservableSlim = require('observable-slim');
+const { getAudioDurationInSeconds } = require('get-audio-duration');
+const client = new Discord.Client(config.DiscordClient);
 
 const filterAdmins = (role) => {
 	switch (role.id) {
@@ -85,42 +85,110 @@ let voz = null;
 let current = null;
 var guild_voice = {};
 var guild_voice_status = {};
+let guild_voice_queue = {};
+let guild_voice_queue_executing = {};
 
-async function joinChannel(guildID,channel) {
-	if (guild_voice[guildID]!==null) {
-		//console.log('There is a voice presence');
-	}
-	//console.log('Requesting join to '+channel.id);
-	await channel.join().then(async (voz) => {
-		//console.log('joined '+voz.channel.id);
-		if (guild_voice[guildID]===null) {
-			voz.on('disconnect',connection => {
-				guild_voice[guildID] = null;
-				guild_voice_status[guildID] = false;
+async function joinChannel(guild,channel) {
+	if (guild_voice[guild.id]!==null) {
+		if (guild_voice[guild.id].channel.id!==channel.id) {
+			await channel.join().then(async (voz) => {
+				console.log('['+guild.name+'] SWITCHED --> '+channel.id+' ('+channel.name+')');
+			}).catch( (error) => {
+				console.log('['+guild.name+'] joinChannel ERROR',error);
+				channel.leave();
 			});
-			voz.on('error', () => {console.error});
 		}
-		guild_voice[guildID] = voz;
-		guild_voice_status[guildID] = false;
-		return true;
-	}).catch(console.error);
+	}
+	if (guild_voice[guild.id]===null) {
+		console.log('['+guild.name+'] JOIN --> '+channel.id+' ('+channel.name+')');
+		await channel.join().then(async (voz) => {
+			console.log('['+guild.name+'] '+channel.id+' ('+channel.name+') Binding...');
+			voz.on('disconnect',disconnect => {
+				console.log('['+guild.name+'] DISCONNECTED');
+			});
+			voz.on('newSession',newSession => {
+				console.log('['+guild.name+'] newSession',newSession);
+			});
+			voz.on('reconnecting',reconnecting => {
+				console.log('['+guild.name+'] MOVED TO '+voz.channel.id+' ('+voz.channel.name+')');
+			});
+			voz.on('warn',warn => {
+				console.log('['+guild.name+'] warn',warn);
+			});
+			voz.on('failed',failed => {
+				console.log('['+guild.name+'] failed',failed);
+			});
+			voz.on('authenticated',authenticated => {
+				console.log('['+guild.name+'] authenticated',authenticated);
+			});
+			voz.on('error', error => {
+				console.log('['+guild.name+'] error',error);
+			});
+			guild_voice[guild.id] = voz;
+			guild_voice_status[guild.id] = false;
+		}).catch( (error) => {
+			console.log('['+guild.name+'] joinChannel ERROR',error);
+			channel.leave();
+		});
+		console.log('['+guild.name+'] JOINED --> '+channel.id+' ('+channel.name+')');
+	}
+}
+
+async function audioQueue(guild,queue) {
+	if (guild_voice_queue_executing[guild.id]===false) {
+		guild_voice_queue_executing[guild.id] = true;
+		let toPlay = queue.shift();
+		if (toPlay===undefined) {
+			guild_voice_queue_executing[guild.id] = false;
+			return false;
+		}
+		let audioLength = 0;
+		await joinChannel(toPlay.guild,toPlay.channel);
+		await getAudioDurationInSeconds(toPlay.sound).then(duration => audioLength = duration);
+		await new Promise((resolve,reject) => {
+					setTimeout(() => {
+						if (typeof guild_voice[toPlay.guild.id]==='object'&&guild_voice[toPlay.guild.id]!==null) {
+							guild_voice[toPlay.guild.id].play(toPlay.sound);
+							console.log('['+toPlay.guild.name+'] Playing: '+toPlay.sound);
+							setTimeout(() => {
+								resolve('Played!');
+							},(audioLength*1000));
+						} else {
+							reject('['+toPlay.guild.name+'] No object on voice!');
+						}
+					}, 750)
+				}).catch( async (error) => {console.log(error); });
+		guild_voice_queue_executing[guild.id] = false;
+		audioQueue(guild,queue);
+	}
+}
+
+async function playSound(guild,channel,sound) {
+	var pendingPlay = {};
+	pendingPlay.guild = guild;
+	pendingPlay.channel = channel;
+	pendingPlay.sound = sound;
+	guild_voice_queue[guild.id].push(pendingPlay);
+	audioQueue(guild,guild_voice_queue[guild.id]);
 }
 
 async function notifyChannel(guild,channel,member,joined) {
+	/*
 	if (
 		guild_voice[guild.id]===null
 		&&guild_voice_status[guild.id]==false
 	) {
 		guild_voice_status[guild.id] = true;
-		await joinChannel(guild.id,channel);
+		await joinChannel(guild,channel);
 	} else if (
 		guild_voice[guild.id]!==null
 		&&channel.id!==guild_voice[guild.id].channel.id
 		&&guild_voice_status[guild.id]==false
 	) {
 		guild_voice_status[guild.id] = true;
-		await joinChannel(guild.id,channel);
+		await joinChannel(guild,channel);
 	}
+	*/
 	var nickname = member.nickname;
 	if (nickname===null) {
 		nickname = member.user.username;
@@ -136,7 +204,11 @@ async function notifyChannel(guild,channel,member,joined) {
 			case '358776832536870913': //Taquero
 				sonido = './sounds/join_taquero.ogg'; break;
 			case '468956439528996864': //Dayreff
-				sonido = './sounds/join_dayreff.ogg'; break;
+				switch (Math.floor(Math.random() * Math.floor(2))) {
+					case  0: sonido = './sounds/join_dayreff.ogg'; break;
+					case  1: sonido = './sounds/join_dayreff2.ogg'; break;
+				}
+				break;
 			case '285061921453899776': //Elma
 				sonido = './sounds/join_elma.ogg'; break;
 			case '402277903372517397': //Personalizado
@@ -160,10 +232,14 @@ async function notifyChannel(guild,channel,member,joined) {
 			default:
 				sonido = './sounds/join_default.ogg';
 		}
+		playSound(guild,channel,sonido);
+		/*
 		await new Promise((resolve,reject) => {
 			setTimeout(() => {
 				if (typeof guild_voice[guild.id]==='object'&&guild_voice[guild.id]!==null) {
 					guild_voice[guild.id].play(sonido);
+					playSound(guild,channel,sonido);
+					console.log('Playing: '+sonido);
 					setTimeout(() => {
 						resolve('Played!');
 					},1500);
@@ -172,7 +248,7 @@ async function notifyChannel(guild,channel,member,joined) {
 				}
 			}, 750)
 		}).catch( async (error) => {console.log(error); });
-		//await new Promise(resolve => setTimeout(() => guild_voice[guild.id].play(sonido), 750)).catch( async (error) => {console.log(error); });
+		*/
 	} else {
 		console.log('['+guild.name+']'+nickname+' ha abandonado el canal... Diciendo "Adiós!"...');
 		var sonido = '';
@@ -185,10 +261,14 @@ async function notifyChannel(guild,channel,member,joined) {
 			default:
 				sonido = './sounds/leave_default.ogg';
 		}
+		playSound(guild,channel,sonido);
+		/*
 		await new Promise((resolve,reject) => {
 			setTimeout(() => {
 				if (typeof guild_voice[guild.id]==='object'&&guild_voice[guild.id]!==null) {
 					guild_voice[guild.id].play(sonido);
+					playSound(guild,channel,sonido);
+					console.log('Playing: '+sonido);
 					setTimeout(() => {
 						resolve('Played!');
 					},1500);
@@ -197,7 +277,7 @@ async function notifyChannel(guild,channel,member,joined) {
 				}
 			}, 750)
 		}).catch( async (error) => {console.log(error); });
-		//await new Promise(resolve => setTimeout(() => guild_voice[guild.id].play(sonido), 750)).catch( async (error) => {console.log(error); });
+		*/
 	}
 }
 
@@ -211,6 +291,9 @@ client.on('guildCreate', guild => {
 		guilds_data[guild.id] = require('./guilds/default.json');
 	}
 	guild_voice[guild.id] = null;
+	guild_voice_queue[guild.id] = [];
+	guild_voice_queue_executing[guild.id] = false;
+	guild_voice_status[guild.id] = false;
 })
 client.on('guildDelete', guild => {
 	console.log('He abandonado ' + guild.name);
@@ -221,6 +304,7 @@ client.on('ready', () => {
 	console.log('Retrieving guilds...');
 	const defaultGuildConfig = require('./guilds/default.json');
 	client.guilds.cache.forEach((guild) => {
+		console.log('Loading... ./guilds/'+guild.id+'.json ['+guild.name+']');
 		if (fs.existsSync('./guilds/'+guild.id+'.json')) {
 			guilds_data[guild.id] = Object.assign({}, defaultGuildConfig);
 			guilds_data[guild.id] = Object.assign(guilds_data[guild.id], require('./guilds/'+guild.id+'.json'));
@@ -228,6 +312,8 @@ client.on('ready', () => {
 			guilds_data[guild.id] = require('./guilds/default.json');
 		}
 		guild_voice[guild.id] = null;
+		guild_voice_queue[guild.id] = [];
+		guild_voice_queue_executing[guild.id] = false;
 		guild_voice_status[guild.id] = false;
 	});
 });
@@ -272,27 +358,47 @@ client.on('voiceStateUpdate', async (oldState, newState) => {
 });
 client.on('message', async message => {
 	if (!message.guild) return;
+	/* establecer variables de uso común */
+	var member = await message.channel.guild.members.fetch(message.author.id).catch( async (error) => {
+		return false;
+	});
+	if (member===false) {
+		return false;
+	}
+	let voiceChannel = null;
+	if (member.voice.channelID!==null) {
+		await client.channels.fetch(member.voice.channelID).then(function (channel) {
+			voiceChannel = channel;
+		}).catch( error => console.error );
+	}
+
 	// command processing
 	procesar = message.content.split(' ');
 	command = procesar[0];
 	procesar.shift();
 	parameter = procesar.join(' ');
-	if (command.length>0) {
-		var member = message.channel.guild.members.cache.get(message.author.id);
-	}
 	switch (command.toLowerCase()) {
 		case guilds[message.guild.id].prefix+'burbuja':
 			quickBotReply(message,'Puedes invitarme a tu servidor con https://discord.com/oauth2/authorize?client_id=724218726190415902&scope=bot %s',parameter,'<@'+message.author.id+'>');
 			break;
 		case guilds[message.guild.id].prefix+'trabajo':
 		case guilds[message.guild.id].prefix+'trabajo?':
-			guild_voice[message.guild.id].play('./trabajo.ogg');
+			playSound(message.guild,voiceChannel,'./trabajo.ogg');
+			break;
+		case guilds[message.guild.id].prefix+'aracuan':
+			playSound(message.guild,voiceChannel,'./sounds/aracuan.ogg');
+			break;
+		case guilds[message.guild.id].prefix+'hahaha':
+			playSound(message.guild,voiceChannel,'./sounds/hahaha.ogg');
+			break;
+		case guilds[message.guild.id].prefix+'science':
+			playSound(message.guild,voiceChannel,'./sounds/hahaha_science_is_hard.ogg');
 			break;
 		case guilds[message.guild.id].prefix+'di':
 			if (guild_voice[message.guild.id]!==null) {
 				const textohablado = discordTTS.getVoiceStream(parameter,'es-US');
 				quickBotReply(message,'Ok %s!','<@'+message.author.id+'>');
-				guild_voice[message.guild.id].play(textohablado);
+				playSound(message.guild,voiceChannel,textohablado);
 			} else {
 				quickBotReply(message,'Necesito estar en un canal %s!','<@'+message.author.id+'>');
 			}
@@ -302,7 +408,7 @@ client.on('message', async message => {
 				if (guilds[message.guild.id].hasTTSuntil>Math.floor(new Date().getTime() / 1000)) {
 					const playFile = await GeneraVoz(parameter);
 					quickBotReply(message,'Ok %s!','<@'+message.author.id+'>');
-					guild_voice[message.guild.id].play(playFile);
+					playSound(message.guild,voiceChannel,playFile);
 				} else {
 					quickBotReply(message,'Es necesario tener el privilegio premium para este servidor %s!','<@'+message.author.id+'>');
 				}
@@ -323,6 +429,10 @@ client.on('message', async message => {
 				if (parameter.length>0) {
 					quickBotReply(message,'SUCCESSFUL');
 				}
+				break;
+			case guilds[message.guild.id].prefix+'audioQueue':
+				console.log('['+toPlay.guild.name+'] Manual audioQueue()');
+				audioQueue(guild,guild_voice_queue[guild.id]);
 				break;
 			case guilds[message.guild.id].prefix+'prefix':
 				if (parameter.length>0) {
