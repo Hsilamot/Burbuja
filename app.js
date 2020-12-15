@@ -149,7 +149,7 @@ async function audioQueue(guild,queue) {
 					setTimeout(() => {
 						if (typeof guild_voice[toPlay.guild.id]==='object'&&guild_voice[toPlay.guild.id]!==null) {
 							guild_voice[toPlay.guild.id].play(toPlay.sound);
-							console.log('['+toPlay.guild.name+'] Playing: '+toPlay.sound);
+							console.log('['+toPlay.guild.name+'] '+guild_voice[toPlay.guild.id].channel.id+' ('+guild_voice[toPlay.guild.id].channel.name+') Playing: '+toPlay.sound);
 							setTimeout(() => {
 								resolve('Played!');
 							},(audioLength*1000));
@@ -194,8 +194,9 @@ async function notifyChannel(guild,channel,member,joined) {
 		nickname = member.user.username;
 	}
 	if (joined) {
-		console.log('['+guild.name+']'+nickname+' se ha unido al canal... Diciendo "Hola!"...');
+		console.log('['+guild.name+'] '+nickname+' JOINED '+channel.id+' ('+channel.name+')');
 		var sonido = '';
+		var saludo = '';
 		switch (member.user.id) {
 			case '436724739868721153': //Zeus
 				sonido = './sounds/join_zeus.ogg'; break;
@@ -231,8 +232,16 @@ async function notifyChannel(guild,channel,member,joined) {
 				sonido = './sounds/join_liontzuky3.ogg'; break;
 			default:
 				sonido = './sounds/join_default.ogg';
+				if (guilds[guild.id].sayNames) {
+					saludo = nickname;
+				}
 		}
 		playSound(guild,channel,sonido);
+		if (saludo!=='') {
+			const saludoFile = await GeneraVoz(saludo);
+			playSound(guild,channel,saludoFile);
+		}
+
 		/*
 		await new Promise((resolve,reject) => {
 			setTimeout(() => {
@@ -250,8 +259,9 @@ async function notifyChannel(guild,channel,member,joined) {
 		}).catch( async (error) => {console.log(error); });
 		*/
 	} else {
-		console.log('['+guild.name+']'+nickname+' ha abandonado el canal... Diciendo "Adiós!"...');
+		console.log('['+guild.name+'] '+nickname+' LEFT '+channel.id+' ('+channel.name+')');
 		var sonido = '';
+		var saludo = '';
 		switch (member.user.id) {
 			case '468956439528996864': //Dayreff
 				sonido = './sounds/leave_dayreff.ogg'; break;
@@ -260,8 +270,15 @@ async function notifyChannel(guild,channel,member,joined) {
 			case '358776832536870913': //Taquero
 			default:
 				sonido = './sounds/leave_default.ogg';
+				if (guilds[guild.id].sayNames) {
+					saludo = nickname;
+				}
 		}
 		playSound(guild,channel,sonido);
+		if (saludo!=='') {
+			const saludoFile = await GeneraVoz(saludo);
+			playSound(guild,channel,saludoFile);
+		}
 		/*
 		await new Promise((resolve,reject) => {
 			setTimeout(() => {
@@ -417,7 +434,8 @@ client.on('message', async message => {
 			}
 			break;
 	}
-	if (message.member!==null&&message.member.hasPermission('ADMINISTRATOR')) {
+	if (member.hasPermission('ADMINISTRATOR')) {
+	//if (message.member!==null&&message.member.hasPermission('ADMINISTRATOR')) {
 		switch (command.toLowerCase()) {
 			case 'dumpcomnfig2020':
 				quickBotReply(message,'Actualmente: '+JSON.stringify(guilds[message.guild.id]));
@@ -453,6 +471,14 @@ client.on('message', async message => {
 					guild_voice_status[message.guild.id] = false;
 				}
 				guilds[message.guild.id].enabled = false;
+				break;
+			case guilds[message.guild.id].prefix+'connombre':
+				quickBotReply(message,'Ok mencionaré los nombres %s!','<@'+message.author.id+'>');
+				guilds[message.guild.id].sayNames = true;
+				break;
+			case guilds[message.guild.id].prefix+'sinnombre':
+				quickBotReply(message,'Ok ya no mencionaré los nombres %s!','<@'+message.author.id+'>');
+				guilds[message.guild.id].sayNames = false;
 				break;
 		}
 	}
