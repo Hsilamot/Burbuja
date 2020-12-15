@@ -154,9 +154,10 @@ async function audioQueue(guild,queue) {
 								resolve('Played!');
 							},(audioLength*1000));
 						} else {
+							queue.unshift(toPlay);
 							reject('['+toPlay.guild.name+'] No object on voice!');
 						}
-					}, 750)
+					}, 150)
 				}).catch( async (error) => {console.log(error); });
 		guild_voice_queue_executing[guild.id] = false;
 		audioQueue(guild,queue);
@@ -399,18 +400,77 @@ client.on('message', async message => {
 			quickBotReply(message,'Puedes invitarme a tu servidor con https://discord.com/oauth2/authorize?client_id=724218726190415902&scope=bot %s',parameter,'<@'+message.author.id+'>');
 			break;
 		case guilds[message.guild.id].prefix+'trabajo':
-		case guilds[message.guild.id].prefix+'trabajo?':
-			playSound(message.guild,voiceChannel,'./trabajo.ogg');
-			break;
-		case guilds[message.guild.id].prefix+'aracuan':
-			playSound(message.guild,voiceChannel,'./sounds/aracuan.ogg');
-			break;
-		case guilds[message.guild.id].prefix+'hahaha':
-			playSound(message.guild,voiceChannel,'./sounds/hahaha.ogg');
-			break;
-		case guilds[message.guild.id].prefix+'science':
-			playSound(message.guild,voiceChannel,'./sounds/hahaha_science_is_hard.ogg');
-			break;
+		case guilds[message.guild.id].prefix+'trabajo?': playSound(message.guild,voiceChannel,'./trabajo.ogg'); break;
+		case guilds[message.guild.id].prefix+'aracuan': playSound(message.guild,voiceChannel,'./sounds/aracuan.ogg'); break;
+		case guilds[message.guild.id].prefix+'hahaha': playSound(message.guild,voiceChannel,'./sounds/hahaha.ogg'); break;
+		case guilds[message.guild.id].prefix+'science': playSound(message.guild,voiceChannel,'./sounds/hahaha_science_is_hard.ogg'); break;
+		case guilds[message.guild.id].prefix+'anotherfag': playSound(message.guild,voiceChannel,'./sounds/anotherfag.ogg'); break;
+		case guilds[message.guild.id].prefix+'badumtss': playSound(message.guild,voiceChannel,'./sounds/badumtss.ogg'); break;
+		case guilds[message.guild.id].prefix+'crybaby': playSound(message.guild,voiceChannel,'./sounds/crybaby.ogg'); break;
+		case guilds[message.guild.id].prefix+'bokusatchii': playSound(message.guild,voiceChannel,'./sounds/bokusatchii.ogg'); break;
+		case guilds[message.guild.id].prefix+'brokenglass': playSound(message.guild,voiceChannel,'./sounds/brokenglass.ogg'); break;
+		case guilds[message.guild.id].prefix+'ogh': playSound(message.guild,voiceChannel,'./sounds/ogh.ogg'); break;
+		case guilds[message.guild.id].prefix+'catscreaming': playSound(message.guild,voiceChannel,'./sounds/catscreaming.ogg'); break;
+		case guilds[message.guild.id].prefix+'cryofthehawk': playSound(message.guild,voiceChannel,'./sounds/cryofthehawk.ogg'); break;
+		case guilds[message.guild.id].prefix+'gunshot': playSound(message.guild,voiceChannel,'./sounds/gunshot.ogg'); break;
+		case guilds[message.guild.id].prefix+'recordscratch': playSound(message.guild,voiceChannel,'./sounds/recordscratch.ogg'); break;
+		case guilds[message.guild.id].prefix+'facebookspam': playSound(message.guild,voiceChannel,'./sounds/facebookspam.ogg'); break;
+		case guilds[message.guild.id].prefix+'cuacuacua': playSound(message.guild,voiceChannel,'./sounds/cuacuacua.ogg'); break;
+		case guilds[message.guild.id].prefix+'mexicanfanfarrias': playSound(message.guild,voiceChannel,'./sounds/mexicanfanfarrias.ogg'); break;
+		case guilds[message.guild.id].prefix+'fuckyou': playSound(message.guild,voiceChannel,'./sounds/fuckyou.ogg'); break;
+		case guilds[message.guild.id].prefix+'fightsounds': playSound(message.guild,voiceChannel,'./sounds/fightsounds.ogg'); break;
+		case guilds[message.guild.id].prefix+'eslomasestupido': playSound(message.guild,voiceChannel,'./sounds/eslomasestupido.ogg'); break;
+		case guilds[message.guild.id].prefix+'jajaja': playSound(message.guild,voiceChannel,'./sounds/jajaja.ogg'); break;
+		case guilds[message.guild.id].prefix+'jejeje': playSound(message.guild,voiceChannel,'./sounds/jejeje.ogg'); break;
+		case guilds[message.guild.id].prefix+'jijiji': playSound(message.guild,voiceChannel,'./sounds/jijiji.ogg'); break;
+		case guilds[message.guild.id].prefix+'nononohahaha': playSound(message.guild,voiceChannel,'./sounds/nononohahaha.ogg'); break;
+		case guilds[message.guild.id].prefix+'wrongbuzzer': playSound(message.guild,voiceChannel,'./sounds/wrongbuzzer.ogg'); break;
+		case guilds[message.guild.id].prefix+'abathurscream': playSound(message.guild,voiceChannel,'./sounds/abathurscream.ogg'); break;
+		case guilds[message.guild.id].prefix+'gotchabitch': playSound(message.guild,voiceChannel,'./sounds/gotchabitch.ogg'); break;
+		case guilds[message.guild.id].prefix+'reloadgun': playSound(message.guild,voiceChannel,'./sounds/reloadgun.ogg'); break;
+		case guilds[message.guild.id].prefix+'gyaaaaaaa': playSound(message.guild,voiceChannel,'./sounds/gyaaaaaaa.ogg'); break;
+		case guilds[message.guild.id].prefix+'maniaclaugh': playSound(message.guild,voiceChannel,'./sounds/maniaclaugh.ogg'); break;
+		case guilds[message.guild.id].prefix+'headshot': playSound(message.guild,voiceChannel,'./sounds/headshot.ogg'); break;
+		case guilds[message.guild.id].prefix+'helpme': playSound(message.guild,voiceChannel,'./sounds/helpme.ogg'); break;
+		case guilds[message.guild.id].prefix+'horrorscream': playSound(message.guild,voiceChannel,'./sounds/horrorscream.ogg'); break;
+		case guilds[message.guild.id].prefix+'inception': playSound(message.guild,voiceChannel,'./sounds/inception.ogg'); break;
+		case guilds[message.guild.id].prefix+'johncena': playSound(message.guild,voiceChannel,'./sounds/johncena.ogg'); break;
+		case guilds[message.guild.id].prefix+'lol': playSound(message.guild,voiceChannel,'./sounds/lol.ogg'); break;
+		case guilds[message.guild.id].prefix+'dundundun': playSound(message.guild,voiceChannel,'./sounds/dundundun.ogg'); break;
+		case guilds[message.guild.id].prefix+'clickclick': playSound(message.guild,voiceChannel,'./sounds/clickclick.ogg'); break;
+		case guilds[message.guild.id].prefix+'mynameisjeff': playSound(message.guild,voiceChannel,'./sounds/mynameisjeff.ogg'); break;
+		case guilds[message.guild.id].prefix+'mistery': playSound(message.guild,voiceChannel,'./sounds/mistery.ogg'); break;
+		case guilds[message.guild.id].prefix+'pizzapasta': playSound(message.guild,voiceChannel,'./sounds/pizzapasta.ogg'); break;
+		case guilds[message.guild.id].prefix+'letmeout': playSound(message.guild,voiceChannel,'./sounds/letmeout.ogg'); break;
+		case guilds[message.guild.id].prefix+'run': playSound(message.guild,voiceChannel,'./sounds/run.ogg'); break;
+		case guilds[message.guild.id].prefix+'madscream': playSound(message.guild,voiceChannel,'./sounds/madscream.ogg'); break;
+		case guilds[message.guild.id].prefix+'shutup': playSound(message.guild,voiceChannel,'./sounds/shutup.ogg'); break;
+		case guilds[message.guild.id].prefix+'shutyourbitchassup': playSound(message.guild,voiceChannel,'./sounds/shutyourbitchassup.ogg'); break;
+		case guilds[message.guild.id].prefix+'snoring': playSound(message.guild,voiceChannel,'./sounds/snoring.ogg'); break;
+		case guilds[message.guild.id].prefix+'mexicanscanner': playSound(message.guild,voiceChannel,'./sounds/mexicanscanner.ogg'); break;
+		case guilds[message.guild.id].prefix+'veetealamierda': playSound(message.guild,voiceChannel,'./sounds/veetealamierda.ogg'); break;
+		case guilds[message.guild.id].prefix+'vetealamierda': playSound(message.guild,voiceChannel,'./sounds/vetealamierda.ogg'); break;
+		case guilds[message.guild.id].prefix+'ahvetealamierda': playSound(message.guild,voiceChannel,'./sounds/ahvetealamierda.ogg'); break;
+		case guilds[message.guild.id].prefix+'nonononononono': playSound(message.guild,voiceChannel,'./sounds/nonononononono.ogg'); break;
+		case guilds[message.guild.id].prefix+'ohvetealamierda': playSound(message.guild,voiceChannel,'./sounds/ohvetealamierda.ogg'); break;
+		case guilds[message.guild.id].prefix+'spinningcrystal': playSound(message.guild,voiceChannel,'./sounds/spinningcrystal.ogg'); break;
+		case guilds[message.guild.id].prefix+'pffthahaha': playSound(message.guild,voiceChannel,'./sounds/pffthahaha.ogg'); break;
+		case guilds[message.guild.id].prefix+'supermariocoin': playSound(message.guild,voiceChannel,'./sounds/supermariocoin.ogg'); break;
+		case guilds[message.guild.id].prefix+'surprisemotherfucker': playSound(message.guild,voiceChannel,'./sounds/surprisemotherfucker.ogg'); break;
+		case guilds[message.guild.id].prefix+'swish2': playSound(message.guild,voiceChannel,'./sounds/swish2.ogg'); break;
+		case guilds[message.guild.id].prefix+'swish': playSound(message.guild,voiceChannel,'./sounds/swish.ogg'); break;
+		case guilds[message.guild.id].prefix+'tiefighter': playSound(message.guild,voiceChannel,'./sounds/tiefighter.ogg'); break;
+		case guilds[message.guild.id].prefix+'titanicbad': playSound(message.guild,voiceChannel,'./sounds/titanicbad.ogg'); break;
+		case guilds[message.guild.id].prefix+'trompetaalarma': playSound(message.guild,voiceChannel,'./sounds/trompetaalarma.ogg'); break;
+		case guilds[message.guild.id].prefix+'trompeta': playSound(message.guild,voiceChannel,'./sounds/trompeta.ogg'); break;
+		case guilds[message.guild.id].prefix+'unowenwasher': playSound(message.guild,voiceChannel,'./sounds/unowenwasher.ogg'); break;
+		case guilds[message.guild.id].prefix+'whatisthat': playSound(message.guild,voiceChannel,'./sounds/whatisthat.ogg'); break;
+		case guilds[message.guild.id].prefix+'whosthatpokemon': playSound(message.guild,voiceChannel,'./sounds/whosthatpokemon.ogg'); break;
+		case guilds[message.guild.id].prefix+'werror': playSound(message.guild,voiceChannel,'./sounds/werror.ogg'); break;
+		case guilds[message.guild.id].prefix+'bruh': playSound(message.guild,voiceChannel,'./sounds/bruh.ogg'); break;
+		case guilds[message.guild.id].prefix+'wtf': playSound(message.guild,voiceChannel,'./sounds/wtf.ogg'); break;
+		case guilds[message.guild.id].prefix+'yourmom': playSound(message.guild,voiceChannel,'./sounds/yourmom.ogg'); break;
+		case guilds[message.guild.id].prefix+'zelda': playSound(message.guild,voiceChannel,'./sounds/zelda.ogg'); break;
 		case guilds[message.guild.id].prefix+'di':
 			if (guild_voice[message.guild.id]!==null) {
 				const textohablado = discordTTS.getVoiceStream(parameter,'es-US');
