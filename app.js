@@ -7,21 +7,10 @@ var crypto = require('crypto');
 const Discord = require('discord.js');
 const discordTTS = require('discord-tts');
 const GoogleCloudTextToSpeech = require('@google-cloud/text-to-speech');
-const { OpusEncoder } = require('@discordjs/opus');
 const ObservableSlim = require('observable-slim');
 const { getAudioDurationInSeconds } = require('get-audio-duration');
 const client = new Discord.Client(config.DiscordClient);
-
-const filterAdmins = (role) => {
-	switch (role.id) {
-		case '385651272331558914': return true;
-		case '425098664915238923': return true;
-		case '496439911117881365': return true;
-		case '603787160755372032': return true;
-		case '529088098999730206': return true;
-	}
-	return false;
-}
+var touch = require("touch")
 
 var guilds_data = {};
 var guilds = ObservableSlim.create(guilds_data, true, function(changes) {
@@ -54,6 +43,7 @@ async function GeneraVoz(textoaconvertir) {
 	sha512hash = hashraw.digest('hex');
 	try {
 		if (fs.existsSync('voice_cache/'+sha512hash+'.ogg')) {
+			touch('voice_cache/'+sha512hash+'.ogg');
 			return 'voice_cache/'+sha512hash+'.ogg';
 		} else {
 			const [response] = await googleTTS.synthesizeSpeech(request);
@@ -89,12 +79,13 @@ let guild_voice_queue = {};
 let guild_voice_queue_executing = {};
 
 async function joinChannel(guild,channel) {
+	if (!guilds[guild.id].enabled) { return false; }
 	if (guild_voice[guild.id]!==null) {
 		if (guild_voice[guild.id].channel.id!==channel.id) {
 			await channel.join().then(async (voz) => {
 				console.log('['+guild.name+'] SWITCHED --> '+channel.id+' ('+channel.name+')');
 			}).catch( (error) => {
-				console.log('['+guild.name+'] joinChannel ERROR',error);
+				console.log('['+guild.name+'] joinChannel ERROR ON SWITCH',error);
 				channel.leave();
 			});
 		}
@@ -135,6 +126,7 @@ async function joinChannel(guild,channel) {
 }
 
 async function audioQueue(guild,queue) {
+	if (!guilds[guild.id].enabled) { return false; }
 	if (guild_voice_queue_executing[guild.id]===false) {
 		guild_voice_queue_executing[guild.id] = true;
 		let toPlay = queue.shift();
@@ -165,6 +157,7 @@ async function audioQueue(guild,queue) {
 }
 
 async function playSound(guild,channel,sound) {
+	if (!guilds[guild.id].enabled) { return false; }
 	var pendingPlay = {};
 	pendingPlay.guild = guild;
 	pendingPlay.channel = channel;
@@ -174,22 +167,6 @@ async function playSound(guild,channel,sound) {
 }
 
 async function notifyChannel(guild,channel,member,joined) {
-	/*
-	if (
-		guild_voice[guild.id]===null
-		&&guild_voice_status[guild.id]==false
-	) {
-		guild_voice_status[guild.id] = true;
-		await joinChannel(guild,channel);
-	} else if (
-		guild_voice[guild.id]!==null
-		&&channel.id!==guild_voice[guild.id].channel.id
-		&&guild_voice_status[guild.id]==false
-	) {
-		guild_voice_status[guild.id] = true;
-		await joinChannel(guild,channel);
-	}
-	*/
 	var nickname = member.nickname;
 	if (nickname===null) {
 		nickname = member.user.username;
@@ -242,23 +219,6 @@ async function notifyChannel(guild,channel,member,joined) {
 			const saludoFile = await GeneraVoz(saludo);
 			playSound(guild,channel,saludoFile);
 		}
-
-		/*
-		await new Promise((resolve,reject) => {
-			setTimeout(() => {
-				if (typeof guild_voice[guild.id]==='object'&&guild_voice[guild.id]!==null) {
-					guild_voice[guild.id].play(sonido);
-					playSound(guild,channel,sonido);
-					console.log('Playing: '+sonido);
-					setTimeout(() => {
-						resolve('Played!');
-					},1500);
-				} else {
-					reject('No object on voice!');
-				}
-			}, 750)
-		}).catch( async (error) => {console.log(error); });
-		*/
 	} else {
 		console.log('['+guild.name+'] '+nickname+' LEFT '+channel.id+' ('+channel.name+')');
 		var sonido = '';
@@ -280,22 +240,6 @@ async function notifyChannel(guild,channel,member,joined) {
 			const saludoFile = await GeneraVoz(saludo);
 			playSound(guild,channel,saludoFile);
 		}
-		/*
-		await new Promise((resolve,reject) => {
-			setTimeout(() => {
-				if (typeof guild_voice[guild.id]==='object'&&guild_voice[guild.id]!==null) {
-					guild_voice[guild.id].play(sonido);
-					playSound(guild,channel,sonido);
-					console.log('Playing: '+sonido);
-					setTimeout(() => {
-						resolve('Played!');
-					},1500);
-				} else {
-					reject('No object on voice!');
-				}
-			}, 750)
-		}).catch( async (error) => {console.log(error); });
-		*/
 	}
 }
 
