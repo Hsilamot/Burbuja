@@ -80,49 +80,74 @@ let guild_voice_queue_executing = {};
 
 async function joinChannel(guild,channel) {
 	if (!guilds[guild.id].enabled) { return false; }
-	if (guild_voice[guild.id]!==null) {
-		if (guild_voice[guild.id].channel.id!==channel.id) {
-			await channel.join().then(async (voz) => {
-				console.log('['+guild.name+'] SWITCHED --> '+channel.id+' ('+channel.name+')');
-			}).catch( (error) => {
-				console.log('['+guild.name+'] joinChannel ERROR ON SWITCH',error);
-				channel.leave();
-			});
+	return new Promise(async (resolve,reject) => {
+		if (guild_voice[guild.id]!==null) {
+			if (guild_voice[guild.id].channel.id!==channel.id) {
+				await channel.join().then(async (voz) => {
+					console.log('['+guild.name+'] SWITCHED --> '+channel.id+' ('+channel.name+')');
+					setTimeout(() => {
+						resolve('Connected!');
+					},500);
+				}).catch( (error) => {
+					console.log('['+guild.name+'] joinChannel ERROR ON SWITCH',error);
+					channel.leave();
+					setTimeout(() => {
+						reject('Error on Join!');
+					},200);
+				});
+			} else {
+				resolve('Already Connected!');
+			}
 		}
-	}
-	if (guild_voice[guild.id]===null) {
-		console.log('['+guild.name+'] JOIN --> '+channel.id+' ('+channel.name+')');
-		await channel.join().then(async (voz) => {
-			console.log('['+guild.name+'] '+channel.id+' ('+channel.name+') Binding...');
-			voz.on('disconnect',disconnect => {
-				console.log('['+guild.name+'] DISCONNECTED');
+		if (guild_voice[guild.id]===null) {
+			console.log('['+guild.name+'] JOIN --> '+channel.id+' ('+channel.name+')');
+			await channel.join().then(async (voz) => {
+				console.log('['+guild.name+'] '+channel.id+' ('+channel.name+') Binding...');
+				voz.on('disconnect',disconnect => {
+					console.log('['+guild.name+'] voz.DISCONNECTED');
+				});
+				voz.on('newSession',newSession => {
+					console.log('['+guild.name+'] voz.newSession',newSession);
+				});
+				voz.on('reconnecting',reconnecting => {
+					console.log('['+guild.name+'] voz.MOVED TO '+voz.channel.id+' ('+voz.channel.name+')');
+				});
+				voz.on('warn',warn => {
+					console.log('['+guild.name+'] voz.warn',warn);
+				});
+				voz.on('failed',failed => {
+					console.log('['+guild.name+'] voz.failed',failed);
+				});
+				voz.on('authenticated',authenticated => {
+					console.log('['+guild.name+'] voz.authenticated',authenticated);
+				});
+				voz.on('ready', error => {
+					resolve('Voz Ready!');
+				});
+				voz.on('error', error => {
+					console.log('['+guild.name+'] voz.error',error);
+				});
+				guild_voice[guild.id] = voz;
+				guild_voice_status[guild.id] = false;
+				setTimeout(() => {
+					resolve('Connected!');
+				},500);
+			}).catch( (error) => {
+				if (error=='Error [VOICE_JOIN_CHANNEL]: You do not have permission to join this voice channel.') {
+					guilds[guild.id].enabled = false;
+					console.log('['+guild.name+'] Channel Join Access Denied: Disabling bot!');
+					guild_voice_queue[guild.id] = [];
+				} else {
+					console.log('['+guild.name+'] joinChannel Unknown Error: ',error);
+				}
+				channel.leave();
+				setTimeout(() => {
+					reject('Error on Join!');
+				},200);
 			});
-			voz.on('newSession',newSession => {
-				console.log('['+guild.name+'] newSession',newSession);
-			});
-			voz.on('reconnecting',reconnecting => {
-				console.log('['+guild.name+'] MOVED TO '+voz.channel.id+' ('+voz.channel.name+')');
-			});
-			voz.on('warn',warn => {
-				console.log('['+guild.name+'] warn',warn);
-			});
-			voz.on('failed',failed => {
-				console.log('['+guild.name+'] failed',failed);
-			});
-			voz.on('authenticated',authenticated => {
-				console.log('['+guild.name+'] authenticated',authenticated);
-			});
-			voz.on('error', error => {
-				console.log('['+guild.name+'] error',error);
-			});
-			guild_voice[guild.id] = voz;
-			guild_voice_status[guild.id] = false;
-		}).catch( (error) => {
-			console.log('['+guild.name+'] joinChannel ERROR',error);
-			channel.leave();
-		});
-		console.log('['+guild.name+'] JOINED --> '+channel.id+' ('+channel.name+')');
-	}
+			console.log('['+guild.name+'] JOINED --> '+channel.id+' ('+channel.name+')');
+		}
+	});
 }
 
 async function audioQueue(guild,queue) {
