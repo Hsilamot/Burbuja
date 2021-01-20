@@ -196,7 +196,6 @@ async function notifyChannel(guild,channel,member,type) {
 	if (nickname===null) {
 		nickname = member.user.username;
 	}
-console.log('type',type);
 	switch (type) {
 		case 'join':
 			console.log('['+guild.name+'] '+nickname+' JOINED '+channel.id+' ('+channel.name+')');
