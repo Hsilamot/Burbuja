@@ -191,80 +191,138 @@ async function playSound(guild,channel,sound) {
 	audioQueue(guild,guild_voice_queue[guild.id]);
 }
 
-async function notifyChannel(guild,channel,member,joined) {
+async function notifyChannel(guild,channel,member,type) {
 	var nickname = member.nickname;
 	if (nickname===null) {
 		nickname = member.user.username;
 	}
-	if (joined) {
-		console.log('['+guild.name+'] '+nickname+' JOINED '+channel.id+' ('+channel.name+')');
-		var sonido = '';
-		var saludo = '';
-		switch (member.user.id) {
-			case '436724739868721153': //Zeus
-				sonido = './sounds/join_zeus.ogg'; break;
-			case '538464306539528192': //NikoSan
-				sonido = './sounds/join_niko.ogg'; break;
-			case '358776832536870913': //Taquero
-				sonido = './sounds/join_taquero.ogg'; break;
-			case '468956439528996864': //Dayreff
-				switch (Math.floor(Math.random() * Math.floor(2))) {
-					case  0: sonido = './sounds/join_dayreff.ogg'; break;
-					case  1: sonido = './sounds/join_dayreff2.ogg'; break;
-				}
-				break;
-			case '285061921453899776': //Elma
-				sonido = './sounds/join_elma.ogg'; break;
-			case '402277903372517397': //Personalizado
-				sonido = './sounds/join_402277903372517397_wahaha.ogg'; break;
-			case '329392035658465281': //Draxen
-				switch (Math.floor(Math.random() * Math.floor(2))) {
-					case  0: sonido = './sounds/join_draxen.ogg'; break;
-					case  1: sonido = './sounds/join_draxen2.ogg'; break;
-				}
-				break;
-			case '279786562089254912': //Liontzuky
-				switch (Math.floor(Math.random() * Math.floor(4))) {
-					case  0: sonido = './sounds/join_liontzuky.ogg'; break;
-					case  1: sonido = './sounds/join_liontzuky2.ogg'; break;
-					case  2: sonido = './sounds/join_liontzuky3.ogg'; break;
-					case  3: sonido = './sounds/join_liontzuky4.ogg'; break;
-				}
-				break;
-			case '475796286067572766': //Crimson
-				sonido = './sounds/join_liontzuky3.ogg'; break;
-			default:
-				sonido = './sounds/join_default.ogg';
-				if (guilds[guild.id].sayNames) {
-					saludo = nickname;
-				}
-		}
-		playSound(guild,channel,sonido);
-		if (saludo!=='') {
-			const saludoFile = await GeneraVoz(saludo);
+console.log('type',type);
+	switch (type) {
+		case 'join':
+			console.log('['+guild.name+'] '+nickname+' JOINED '+channel.id+' ('+channel.name+')');
+			var sonido = '';
+			var saludo = '';
+			switch (member.user.id) {
+				case '436724739868721153': //Zeus
+					sonido = './sounds/join_zeus.ogg'; break;
+				case '538464306539528192': //NikoSan
+					sonido = './sounds/join_niko.ogg'; break;
+				case '358776832536870913': //Taquero
+					sonido = './sounds/join_taquero.ogg'; break;
+				case '468956439528996864': //Dayreff
+					switch (Math.floor(Math.random() * Math.floor(2))) {
+						case  0: sonido = './sounds/join_dayreff.ogg'; break;
+						case  1: sonido = './sounds/join_dayreff2.ogg'; break;
+					}
+					break;
+				case '285061921453899776': //Elma
+					sonido = './sounds/join_elma.ogg'; break;
+				case '402277903372517397': //Personalizado
+					sonido = './sounds/join_402277903372517397_wahaha.ogg'; break;
+				case '329392035658465281': //Draxen
+					switch (Math.floor(Math.random() * Math.floor(2))) {
+						case  0: sonido = './sounds/join_draxen.ogg'; break;
+						case  1: sonido = './sounds/join_draxen2.ogg'; break;
+					}
+					break;
+				case '279786562089254912': //Liontzuky
+					switch (Math.floor(Math.random() * Math.floor(4))) {
+						case  0: sonido = './sounds/join_liontzuky.ogg'; break;
+						case  1: sonido = './sounds/join_liontzuky2.ogg'; break;
+						case  2: sonido = './sounds/join_liontzuky3.ogg'; break;
+						case  3: sonido = './sounds/join_liontzuky4.ogg'; break;
+					}
+					break;
+				case '475796286067572766': //Crimson
+					sonido = './sounds/join_liontzuky3.ogg'; break;
+				default:
+					sonido = './sounds/join_default.ogg';
+					if (guilds[guild.id].sayNames) {
+						saludo = nickname;
+					}
+			}
+			playSound(guild,channel,sonido);
+			if (saludo!=='') {
+				var saludoFile = await GeneraVoz(saludo);
+				playSound(guild,channel,saludoFile);
+			}
+		case 'leave':
+			console.log('['+guild.name+'] '+nickname+' LEFT '+channel.id+' ('+channel.name+')');
+			var sonido = '';
+			var saludo = '';
+			switch (member.user.id) {
+				case '468956439528996864': //Dayreff
+					sonido = './sounds/leave_dayreff.ogg'; break;
+				case '436724739868721153': //Zeus
+				case '538464306539528192': //NikoSan
+				case '358776832536870913': //Taquero
+				default:
+					sonido = './sounds/leave_default.ogg';
+					if (guilds[guild.id].sayNames) {
+						saludo = nickname;
+					}
+			}
+			playSound(guild,channel,sonido);
+			if (saludo!=='') {
+				var saludoFile = await GeneraVoz(saludo);
+				playSound(guild,channel,saludoFile);
+			}
+			break;
+		case 'serverdeaf':
+			console.log('['+guild.name+'] '+nickname+' Server Deafened '+channel.id+' ('+channel.name+')');
+			var saludoFile = await GeneraVoz('el servidor ha ensordecido a '+nickname);
 			playSound(guild,channel,saludoFile);
-		}
-	} else {
-		console.log('['+guild.name+'] '+nickname+' LEFT '+channel.id+' ('+channel.name+')');
-		var sonido = '';
-		var saludo = '';
-		switch (member.user.id) {
-			case '468956439528996864': //Dayreff
-				sonido = './sounds/leave_dayreff.ogg'; break;
-			case '436724739868721153': //Zeus
-			case '538464306539528192': //NikoSan
-			case '358776832536870913': //Taquero
-			default:
-				sonido = './sounds/leave_default.ogg';
-				if (guilds[guild.id].sayNames) {
-					saludo = nickname;
-				}
-		}
-		playSound(guild,channel,sonido);
-		if (saludo!=='') {
-			const saludoFile = await GeneraVoz(saludo);
+			break;
+		case 'serverundeaf':
+			console.log('['+guild.name+'] '+nickname+' Server UnDeafened '+channel.id+' ('+channel.name+')');
+			var saludoFile = await GeneraVoz('el servidor ahora permite que '+nickname+' escuche');
 			playSound(guild,channel,saludoFile);
-		}
+			break;
+		case 'servermute':
+			console.log('['+guild.name+'] '+nickname+' Server Muted '+channel.id+' ('+channel.name+')');
+			var saludoFile = await GeneraVoz('el servidor ha quitado la palabra a '+nickname);
+			playSound(guild,channel,saludoFile);
+			break;
+		case 'serverunmute':
+			console.log('['+guild.name+'] '+nickname+' Server UnMuted '+channel.id+' ('+channel.name+')');
+			var saludoFile = await GeneraVoz('el servidor ahora permite que '+nickname+' hable');
+			playSound(guild,channel,saludoFile);
+			break;
+		case 'deaf':
+			console.log('['+guild.name+'] '+nickname+' Deafened '+channel.id+' ('+channel.name+')');
+			var saludoFile = await GeneraVoz(nickname+' ya no nos escucha');
+			playSound(guild,channel,saludoFile);
+			break;
+		case 'undeaf':
+			console.log('['+guild.name+'] '+nickname+' UnDeafened '+channel.id+' ('+channel.name+')');
+			var saludoFile = await GeneraVoz(nickname+' nos escucha');
+			playSound(guild,channel,saludoFile);
+			break;
+		case 'mute':
+			console.log('['+guild.name+'] '+nickname+' Muted '+channel.id+' ('+channel.name+')');
+			var saludoFile = await GeneraVoz(nickname+' se muteo');
+			playSound(guild,channel,saludoFile);
+			break;
+		case 'unmute':
+			console.log('['+guild.name+'] '+nickname+' UnMuted '+channel.id+' ('+channel.name+')');
+			var saludoFile = await GeneraVoz(nickname+' encendió micrófono');
+			playSound(guild,channel,saludoFile);
+			break;
+		case 'stream':
+			console.log('['+guild.name+'] '+nickname+' Streaming '+channel.id+' ('+channel.name+')');
+			var saludoFile = await GeneraVoz(nickname+' ha iniciado una transmisión');
+			playSound(guild,channel,saludoFile);
+			break;
+		case 'endstream':
+			console.log('['+guild.name+'] '+nickname+' Ending Stream '+channel.id+' ('+channel.name+')');
+			var saludoFile = await GeneraVoz(nickname+' terminó la transmisión');
+			playSound(guild,channel,saludoFile);
+			break;
+		default:
+			console.log('['+guild.name+'] '+nickname+' Unknown '+channel.id+' ('+channel.name+')');
+			var saludoFile = await GeneraVoz('notificacion desconocida o no reconocida de '+nickname);
+			playSound(guild,channel,saludoFile);
+			break;
 	}
 }
 
@@ -318,7 +376,47 @@ client.on('voiceStateUpdate', async (oldState, newState) => {
 				// User leaves a voice channel // user changes voice chanel
 				await client.channels.fetch(oldState.channelID).then(async function (channel) {
 					var member = await oldState.guild.members.fetch(oldState.id).catch( async (error) => {console.error; });
-					await notifyChannel(oldState.guild,channel,member,false);
+					await notifyChannel(oldState.guild,channel,member,'leave');
+				}).catch( async (error) => {console.error; });
+			}
+			if (newState!==null&&guilds[newState.guild.id].sayStatus) {
+				await client.channels.fetch(newState.channelID).then(async function (channel) {
+					var member = await newState.guild.members.fetch(newState.id).catch( async (error) => {console.error; });
+					if (newState.serverDeaf!==oldState.serverDeaf) {
+						if (newState.serverDeaf) {
+							await notifyChannel(newState.guild,channel,member,'serverdeaf');
+						} else {
+							await notifyChannel(newState.guild,channel,member,'serverundeaf');
+						}
+					}
+					if (newState.serverMute!==oldState.serverMute) {
+						if (newState.serverMute) {
+							await notifyChannel(newState.guild,channel,member,'servermute');
+						} else {
+							await notifyChannel(newState.guild,channel,member,'serverunmute');
+						}
+					}
+					if (newState.selfDeaf!==oldState.selfDeaf) {
+						if (newState.selfDeaf) {
+							await notifyChannel(newState.guild,channel,member,'deaf');
+						} else {
+							await notifyChannel(newState.guild,channel,member,'undeaf');
+						}
+					}
+					if (newState.selfMute!==oldState.selfMute) {
+						if (newState.selfMute) {
+							await notifyChannel(newState.guild,channel,member,'mute');
+						} else {
+							await notifyChannel(newState.guild,channel,member,'unmute');
+						}
+					}
+					if (newState.streaming!==oldState.streaming) {
+						if (newState.streaming) {
+							await notifyChannel(newState.guild,channel,member,'stream');
+						} else {
+							await notifyChannel(newState.guild,channel,member,'endstream');
+						}
+					}
 				}).catch( async (error) => {console.error; });
 			}
 		}
@@ -338,7 +436,7 @@ client.on('voiceStateUpdate', async (oldState, newState) => {
 			}
 			await client.channels.fetch(newState.channelID).then(async function (channel) {
 				var member = await newState.guild.members.fetch(newState.id).catch( async (error) => {console.error; });
-				await notifyChannel(newState.guild,channel,member,true);
+				await notifyChannel(newState.guild,channel,member,'join');
 			}).catch( async (error) => {console.error; });
 		}
 	}
@@ -508,6 +606,14 @@ client.on('message', async message => {
 			case guilds[message.guild.id].prefix+'sinnombre':
 				quickBotReply(message,'Ok ya no mencionaré los nombres %s!','<@'+message.author.id+'>');
 				guilds[message.guild.id].sayNames = false;
+				break;
+			case guilds[message.guild.id].prefix+'conestado':
+				quickBotReply(message,'Ok mencionaré los estado %s!','<@'+message.author.id+'>');
+				guilds[message.guild.id].sayStatus = true;
+				break;
+			case guilds[message.guild.id].prefix+'sinestado':
+				quickBotReply(message,'Ok ya no mencionaré los estado %s!','<@'+message.author.id+'>');
+				guilds[message.guild.id].sayStatus = false;
 				break;
 		}
 	}
