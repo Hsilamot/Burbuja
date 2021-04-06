@@ -150,15 +150,10 @@ async function joinChannel(guild,channel) {
 	});
 }
 
-async function audioQueue(guild,queue) {
-	if (!guilds[guild.id].enabled) { return false; }
-	if (guild_voice_queue_executing[guild.id]===false) {
-		guild_voice_queue_executing[guild.id] = true;
-		let toPlay = queue.shift();
-		if (toPlay===undefined) {
-			guild_voice_queue_executing[guild.id] = false;
-			return false;
-		}
+async function audioQueueChannel(guild,channelId) {
+	let toPlay = guild_voice_queue[guild.id][channelId].shift();
+	if (toPlay!==undefined) {
+		pending = true;
 		let audioLength = 0;
 		await joinChannel(toPlay.guild,toPlay.channel);
 		await getAudioDurationInSeconds(toPlay.sound).then(duration => audioLength = duration);
@@ -169,15 +164,31 @@ async function audioQueue(guild,queue) {
 							console.log('['+toPlay.guild.name+'] '+guild_voice[toPlay.guild.id].channel.id+' ('+guild_voice[toPlay.guild.id].channel.name+') Playing: '+toPlay.sound);
 							setTimeout(() => {
 								resolve('Played!');
-							},(audioLength*1000));
+							},((audioLength*1000)+500));
 						} else {
-							queue.unshift(toPlay);
+							guild_voice_queue[guild.id][i].unshift(toPlay);
 							reject('['+toPlay.guild.name+'] No object on voice!');
 						}
 					}, 150)
 				}).catch( async (error) => {console.log(error); });
+	}
+}
+
+async function audioQueue(guild) {
+	if (!guilds[guild.id].enabled) { return false; }
+	if (guild_voice_queue_executing[guild.id]===false) {
+		guild_voice_queue_executing[guild.id] = true;
+		var pending = false;
+		for (i in guild_voice_queue[guild.id]) {
+			while (typeof guild_voice_queue[guild.id][i]!=='undefined'&&guild_voice_queue[guild.id][i].length>0) {
+				pending = true;
+				await audioQueueChannel(guild,i);
+			}
+		}
 		guild_voice_queue_executing[guild.id] = false;
-		audioQueue(guild,queue);
+		if (pending) {
+			audioQueue(guild);
+		}
 	}
 }
 
@@ -187,14 +198,20 @@ async function playSound(guild,channel,sound) {
 	pendingPlay.guild = guild;
 	pendingPlay.channel = channel;
 	pendingPlay.sound = sound;
-	guild_voice_queue[guild.id].push(pendingPlay);
-	audioQueue(guild,guild_voice_queue[guild.id]);
+	if (typeof guild_voice_queue[guild.id][channel.id] == 'undefined') {
+		guild_voice_queue[guild.id][channel.id] = [];
+	}
+	guild_voice_queue[guild.id][channel.id].push(pendingPlay);
+	audioQueue(guild);
 }
 
 async function notifyChannel(guild,channel,member,type) {
 	var nickname = member.nickname;
-	if (nickname===null) {
+	if (nickname===null||nickname===undefined) {
 		nickname = member.user.username;
+		if (nickname===null||nickname===undefined) {
+			console.log('Undefined Nickname!',member);
+		}
 	}
 	switch (type) {
 		case 'join':
@@ -370,79 +387,84 @@ client.on('voiceStateUpdate', async (oldState, newState) => {
 		return false;
 	}
 	if (oldState!==null) {
-		//Habia un estado previo
-		if (oldState.id==client.user.id) { //el viejo estado involucra a este bot
-			//No hacemos nada cuando somos nosotros
-		} else {
-			if (newState.channelID===null||
-				oldState.channelID!==null&&oldState.channelID!==newState.channelID
-			) {
-				// User leaves a voice channel // user changes voice chanel
-				await client.channels.fetch(oldState.channelID).then(async function (channel) {
-					var member = await oldState.guild.members.fetch(oldState.id).catch( async (error) => {console.error; });
-					await notifyChannel(oldState.guild,channel,member,'leave');
-				}).catch( async (error) => {console.error; });
-			}
-			if (newState!==null&&guilds[newState.guild.id].sayStatus&&oldState.channelID===newState.channelID) {
-				await client.channels.fetch(newState.channelID).then(async function (channel) {
-					var member = await newState.guild.members.fetch(newState.id).catch( async (error) => {console.error; });
-					if (newState.serverDeaf!==oldState.serverDeaf) {
-						if (newState.serverDeaf) {
-							await notifyChannel(newState.guild,channel,member,'serverdeaf');
-						} else {
-							await notifyChannel(newState.guild,channel,member,'serverundeaf');
+		oldState.guild.members.fetch(oldState.id).then(async (member) => {
+			//Habia un estado previo
+			if (oldState.id==client.user.id) { //el viejo estado involucra a este bot
+				//No hacemos nada cuando somos nosotros
+			} else {
+				if (newState.channelID===null||
+					oldState.channelID!==null&&oldState.channelID!==newState.channelID
+				) {
+					// User leaves a voice channel // user changes voice chanel
+					await client.channels.fetch(oldState.channelID).then(async function (channel) {
+						await notifyChannel(oldState.guild,channel,member,'leave');
+					}).catch( async (error) => {console.error; });
+				}
+				if (
+					newState!==null
+					&&guilds[newState.guild.id].sayStatus
+					&&oldState.channelID===newState.channelID
+				) {
+					await client.channels.fetch(newState.channelID).then(async function (channel) {
+						if (newState.serverDeaf!==oldState.serverDeaf) {
+							if (newState.serverDeaf) {
+								await notifyChannel(newState.guild,channel,member,'serverdeaf');
+							} else {
+								await notifyChannel(newState.guild,channel,member,'serverundeaf');
+							}
 						}
-					}
-					if (newState.serverMute!==oldState.serverMute) {
-						if (newState.serverMute) {
-							await notifyChannel(newState.guild,channel,member,'servermute');
-						} else {
-							await notifyChannel(newState.guild,channel,member,'serverunmute');
+						if (newState.serverMute!==oldState.serverMute) {
+							if (newState.serverMute) {
+								await notifyChannel(newState.guild,channel,member,'servermute');
+							} else {
+								await notifyChannel(newState.guild,channel,member,'serverunmute');
+							}
 						}
-					}
-					if (newState.selfDeaf!==oldState.selfDeaf) {
-						if (newState.selfDeaf) {
-							await notifyChannel(newState.guild,channel,member,'deaf');
-						} else {
-							await notifyChannel(newState.guild,channel,member,'undeaf');
+						if (newState.selfDeaf!==oldState.selfDeaf) {
+							if (newState.selfDeaf) {
+								await notifyChannel(newState.guild,channel,member,'deaf');
+							} else {
+								await notifyChannel(newState.guild,channel,member,'undeaf');
+							}
 						}
-					}
-					if (newState.selfMute!==oldState.selfMute) {
-						if (newState.selfMute) {
-							await notifyChannel(newState.guild,channel,member,'mute');
-						} else {
-							await notifyChannel(newState.guild,channel,member,'unmute');
+						if (newState.selfMute!==oldState.selfMute) {
+							if (newState.selfMute) {
+								await notifyChannel(newState.guild,channel,member,'mute');
+							} else {
+								await notifyChannel(newState.guild,channel,member,'unmute');
+							}
 						}
-					}
-					if (newState.streaming!==oldState.streaming) {
-						if (newState.streaming) {
-							await notifyChannel(newState.guild,channel,member,'stream');
-						} else {
-							await notifyChannel(newState.guild,channel,member,'endstream');
+						if (newState.streaming!==oldState.streaming) {
+							if (newState.streaming) {
+								await notifyChannel(newState.guild,channel,member,'stream');
+							} else {
+								await notifyChannel(newState.guild,channel,member,'endstream');
+							}
 						}
-					}
-				}).catch( async (error) => {console.error; });
-			}
-		}
-	}
-	if (newState!==null) { //posible usuario entrando a un canal
-		if (newState.id==client.user.id) { //el nuevo estado involucra a este Bot
-			if (newState.channelID===null) { //El nuevo estado significa que estamos desconectados
-				guild_voice[newState.guild.id] = null; //Ponemos como nulo nuestro handler
-				guild_voice_status[newState.guild.id] = false; //status es falso
-			}
-		} else {
-			if (oldState!==null) { //existia un estado previo
-				if (oldState.channelID==newState.channelID) {
-					//el usuario no cambio de canal, nos quedamos calladitos y no hacemos nada
-					return false;
+					}).catch( async (error) => {console.error; });
 				}
 			}
-			await client.channels.fetch(newState.channelID).then(async function (channel) {
-				var member = await newState.guild.members.fetch(newState.id).catch( async (error) => {console.error; });
-				await notifyChannel(newState.guild,channel,member,'join');
-			}).catch( async (error) => {console.error; });
-		}
+		}).catch( async (error) => {console.error; });
+	}
+	if (newState!==null) { //posible usuario entrando a un canal
+		newState.guild.members.fetch(newState.id).then(async (member) => {
+			if (newState.id==client.user.id) { //el nuevo estado involucra a este Bot
+				if (newState.channelID===null) { //El nuevo estado significa que estamos desconectados
+					guild_voice[newState.guild.id] = null; //Ponemos como nulo nuestro handler
+					guild_voice_status[newState.guild.id] = false; //status es falso
+				}
+			} else {
+				if (oldState!==null) { //existia un estado previo
+					if (oldState.channelID==newState.channelID) {
+						//el usuario no cambio de canal, nos quedamos calladitos y no hacemos nada
+						return false;
+					}
+				}
+				await client.channels.fetch(newState.channelID).then(async function (channel) {
+					await notifyChannel(newState.guild,channel,member,'join');
+				}).catch( async (error) => {console.error; });
+			}
+		}).catch( async (error) => {console.error; });
 	}
 });
 client.on('message', async message => {
@@ -627,8 +649,10 @@ process.on('SIGINT',async () => {
 	for (const [guildID, voz] of Object.entries(guild_voice)) {
 		console.log('GuildID '+guildID);
 		if (voz!==null) {
+			console.log('voz.status before',voz.status);
 			console.log('Requesting voice disconnect.');
 			await voz.disconnect();
+			console.log('voz.status after',voz.status);
 		}
 	};
 	process.exit(0);
