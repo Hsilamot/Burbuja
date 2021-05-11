@@ -1,12 +1,28 @@
 {
-  "dependencies": {
-    "@discordjs/opus": "github:discordjs/opus",
-    "@google-cloud/text-to-speech": "^3.1.3",
-    "discord-tts": "^1.0.3",
-    "discord.js": "^12.2.0",
-    "ffmpeg": "0.0.4",
-    "get-audio-duration": "^2.0.3",
-    "observable-slim": "^0.1.5",
-    "touch": "^3.1.0"
-  }
+	"name": "Bubuja",
+	"description": "Simple bot for saying hello and goodbye to people on discord",
+	"version": "0.8.318",
+	"private": true,
+	"license": "All Rights Reserved",
+	"author": "Hidalgo Rionda",
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/Hsilamot/Burbuja.git"
+	},
+	"engines": {
+		"node": ">=14.0.0"
+	},
+	"scripts": {
+		"start": "node app.js"
+	},
+	"dependencies": {
+		"@discordjs/opus": "github:discordjs/opus",
+		"@google-cloud/text-to-speech": "^3.1.3",
+		"discord-tts": "^1.0.3",
+		"discord.js": "^12.2.0",
+		"ffmpeg": "0.0.4",
+		"get-audio-duration": "^2.0.3",
+		"observable-slim": "^0.1.5",
+		"touch": "^3.1.0"
+	}
 }
