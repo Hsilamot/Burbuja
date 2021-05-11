@@ -382,13 +382,15 @@ client.on('ready', () => {
 				name: 'ping',
 				description: 'No me toques ahi ( •_•)σ'
 			}
-		}).then(()=>{console.log('Registered /ping on ['+guild.name+']')});
+		}).then(()=>{console.log('Registered /ping on ['+guild.name+']')})
+		.catch((error) => console.log(error));
 		client.api.applications(client.user.id).guilds(guild.id).commands.post({
 			data: {
 				name: 'invite',
 				description: 'obtener link de invitación para burbuja'
 			}
-		}).then(()=>{console.log('Registered /di on ['+guild.name+']')});
+		}).then(()=>{console.log('Registered /invite on ['+guild.name+']')})
+		.catch((error) => console.log(error));
 		client.api.applications(client.user.id).guilds(guild.id).commands.post({
 			data: {
 				name: 'config',
@@ -414,7 +416,8 @@ client.on('ready', () => {
 					}
 				]
 			}
-		}).then(()=>{console.log('Registered /config on ['+guild.name+']')});
+		}).then(()=>{console.log('Registered /config on ['+guild.name+']')})
+		.catch((error) => console.log(error));
 		client.api.applications(client.user.id).guilds(guild.id).commands.post({
 			data: {
 				name: 'sound',
@@ -517,7 +520,8 @@ client.on('ready', () => {
 					}
 				]
 			}
-		}).then(()=>{console.log('Registered /sound on ['+guild.name+']')});
+		}).then(()=>{console.log('Registered /sound on ['+guild.name+']')})
+		.catch((error) => console.log(error));
 		client.api.applications(client.user.id).guilds(guild.id).commands.post({
 			data: {
 				name: 'di',
@@ -532,7 +536,8 @@ client.on('ready', () => {
 					}
 				]
 			}
-		}).then(()=>{console.log('Registered /di on ['+guild.name+']')});
+		}).then(()=>{console.log('Registered /di on ['+guild.name+']')})
+		.catch((error) => console.log(error));
 		if (guilds[guild.id].hasTTSuntil>Math.floor(new Date().getTime() / 1000)) {
 			client.api.applications(client.user.id).guilds(guild.id).commands.post({
 				data: {
@@ -548,7 +553,8 @@ client.on('ready', () => {
 						}
 					]
 				}
-			}).then(()=>{console.log('Registered /dipremium on ['+guild.name+']')});
+			}).then(()=>{console.log('Registered /dipremium on ['+guild.name+']')})
+			.catch((error) => console.log(error));
 		}
 	});
 });
@@ -661,7 +667,7 @@ client.ws.on('INTERACTION_CREATE', async interaction => {
 			answer = 'yamete kudasai ರ_ರ';
 			break;
 		case 'invite':
-			answer = 'Puedes invitarme a tu servidor con https://discord.com/oauth2/authorize?client_id='+client.user.id+'&scope=bot';
+			answer = 'Puedes invitarme a tu servidor con https://discord.com/api/oauth2/authorize?client_id='+client.user.id+'&permissions=0&scope=applications.commands%20bot';
 			break;
 		case 'config':
 			if (member.hasPermission('ADMINISTRATOR')) {
