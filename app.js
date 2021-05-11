@@ -377,6 +377,179 @@ client.on('ready', () => {
 		guild_voice_queue[guild.id] = [];
 		guild_voice_queue_executing[guild.id] = false;
 		guild_voice_status[guild.id] = false;
+		client.api.applications(client.user.id).guilds(guild.id).commands.post({
+			data: {
+				name: 'ping',
+				description: 'No me toques ahi ( •_•)σ'
+			}
+		}).then(()=>{console.log('Registered /ping on ['+guild.name+']')});
+		client.api.applications(client.user.id).guilds(guild.id).commands.post({
+			data: {
+				name: 'invite',
+				description: 'obtener link de invitación para burbuja'
+			}
+		}).then(()=>{console.log('Registered /di on ['+guild.name+']')});
+		client.api.applications(client.user.id).guilds(guild.id).commands.post({
+			data: {
+				name: 'config',
+				description: 'Configuraciones',
+				"options": [
+					{
+						"name": "enabled",
+						"description": "Define si entraré o no a los canales para saludar",
+						"type": 5,
+						"required": false,
+					}
+					,{
+						"name": "names",
+						"description": "Define si anexaré o no el nombre de la persona que generó la notificación",
+						"type": 5,
+						"required": false,
+					}
+					,{
+						"name": "states",
+						"description": "Define si notificaré o no cambios de estado (Muteos, desmuteos, etc)",
+						"type": 5,
+						"required": false,
+					}
+				]
+			}
+		}).then(()=>{console.log('Registered /config on ['+guild.name+']')});
+		client.api.applications(client.user.id).guilds(guild.id).commands.post({
+			data: {
+				name: 'sound',
+				description: 'Emite un efecto de audio',
+				"options": [
+					{
+						"name": "efectos1",
+						"description": "Escoje un sonido de la lista",
+						"type": 3,
+						"required": false,
+						"choices": [
+							 {"name": "abathurscream (Extender Descripción)","value": "abathurscream"}
+							,{"name": "ahvetealamierda (Extender Descripción)","value": "ahvetealamierda"}
+							,{"name": "anotherfag (Extender Descripción)","value": "anotherfag"}
+							,{"name": "aracuan (Extender Descripción)","value": "aracuan"}
+							,{"name": "badumtss (Extender Descripción)","value": "badumtss"}
+							,{"name": "bokusatchii (Extender Descripción)","value": "bokusatchii"}
+							,{"name": "brokenglass (Extender Descripción)","value": "brokenglass"}
+							,{"name": "bruh (Extender Descripción)","value": "bruh"}
+							,{"name": "catscreaming (Extender Descripción)","value": "catscreaming"}
+							,{"name": "clickclick (Extender Descripción)","value": "clickclick"}
+							,{"name": "crybaby (Extender Descripción)","value": "crybaby"}
+							,{"name": "cryofthehawk (Extender Descripción)","value": "cryofthehawk"}
+							,{"name": "cuacuacua (Extender Descripción)","value": "cuacuacua"}
+							,{"name": "dundundun (Extender Descripción)","value": "dundundun"}
+							,{"name": "eslomasestupido (Extender Descripción)","value": "eslomasestupido"}
+							,{"name": "facebookspam (Extender Descripción)","value": "facebookspam"}
+							,{"name": "fightsounds (Extender Descripción)","value": "fightsounds"}
+							,{"name": "fuckyou (Extender Descripción)","value": "fuckyou"}
+							,{"name": "gotchabitch (Extender Descripción)","value": "gotchabitch"}
+							,{"name": "gunshot (Extender Descripción)","value": "gunshot"}
+							,{"name": "gyaaaaaaa (Extender Descripción)","value": "gyaaaaaaa"}
+							,{"name": "hahaha (Extender Descripción)","value": "hahaha"}
+							,{"name": "headshot (Extender Descripción)","value": "headshot"}
+							,{"name": "helpme (Extender Descripción)","value": "helpme"}
+							,{"name": "horrorscream (Extender Descripción)","value": "horrorscream"}
+						]
+					}
+					,{
+						"name": "efectos2",
+						"description": "Escoje un sonido de la lista",
+						"type": 3,
+						"required": false,
+						"choices": [
+							 {"name": "inception (Extender Descripción)","value": "inception"}
+							,{"name": "jajaja (Extender Descripción)","value": "jajaja"}
+							,{"name": "jejeje (Extender Descripción)","value": "jejeje"}
+							,{"name": "jijiji (Extender Descripción)","value": "jijiji"}
+							,{"name": "johncena (Extender Descripción)","value": "johncena"}
+							,{"name": "letmeout (Extender Descripción)","value": "letmeout"}
+							,{"name": "lol (Extender Descripción)","value": "lol"}
+							,{"name": "madscream (Extender Descripción)","value": "madscream"}
+							,{"name": "maniaclaugh (Extender Descripción)","value": "maniaclaugh"}
+							,{"name": "mexicanfanfarrias (Extender Descripción)","value": "mexicanfanfarrias"}
+							,{"name": "mexicanscanner (Extender Descripción)","value": "mexicanscanner"}
+							,{"name": "mistery (Extender Descripción)","value": "mistery"}
+							,{"name": "mynameisjeff (Extender Descripción)","value": "mynameisjeff"}
+							,{"name": "nononohahaha (Extender Descripción)","value": "nononohahaha"}
+							,{"name": "nonononononono (Extender Descripción)","value": "nonononononono"}
+							,{"name": "ogh (Extender Descripción)","value": "ogh"}
+							,{"name": "ohvetealamierda (Extender Descripción)","value": "ohvetealamierda"}
+							,{"name": "pffthahaha (Extender Descripción)","value": "pffthahaha"}
+							,{"name": "pizzapasta (Extender Descripción)","value": "pizzapasta"}
+							,{"name": "recordscratch (Extender Descripción)","value": "recordscratch"}
+							,{"name": "reloadgun (Extender Descripción)","value": "reloadgun"}
+							,{"name": "run (Extender Descripción)","value": "run"}
+							,{"name": "science (Extender Descripción)","value": "science"}
+							,{"name": "shutup (Extender Descripción)","value": "shutup"}
+							,{"name": "shutyourbitchassup (Extender Descripción)","value": "shutyourbitchassup"}
+						]
+					}
+					,{
+						"name": "efectos3",
+						"description": "Escoje un sonido de la lista",
+						"type": 3,
+						"required": false,
+						"choices": [
+							 {"name": "snoring (Extender Descripción)","value": "snoring"}
+							,{"name": "spinningcrystal (Extender Descripción)","value": "spinningcrystal"}
+							,{"name": "supermariocoin (Extender Descripción)","value": "supermariocoin"}
+							,{"name": "surprisemotherfucker (Extender Descripción)","value": "surprisemotherfucker"}
+							,{"name": "swish (Extender Descripción)","value": "swish"}
+							,{"name": "swish2 (Extender Descripción)","value": "swish2"}
+							,{"name": "tiefighter (Extender Descripción)","value": "tiefighter"}
+							,{"name": "titanicbad (Extender Descripción)","value": "titanicbad"}
+							,{"name": "trabajo (Extender Descripción)","value": "trabajo"}
+							,{"name": "trompeta (Extender Descripción)","value": "trompeta"}
+							,{"name": "trompetaalarma (Extender Descripción)","value": "trompetaalarma"}
+							,{"name": "unowenwasher (Extender Descripción)","value": "unowenwasher"}
+							,{"name": "veetealamierda (Extender Descripción)","value": "veetealamierda"}
+							,{"name": "vetealamierda (Extender Descripción)","value": "vetealamierda"}
+							,{"name": "werror (Extender Descripción)","value": "werror"}
+							,{"name": "whatisthat (Extender Descripción)","value": "whatisthat"}
+							,{"name": "whosthatpokemon (Extender Descripción)","value": "whosthatpokemon"}
+							,{"name": "wrongbuzzer (Extender Descripción)","value": "wrongbuzzer"}
+							,{"name": "wtf (Extender Descripción)","value": "wtf"}
+							,{"name": "yourmom (Extender Descripción)","value": "yourmom"}
+							,{"name": "zelda (Extender Descripción)","value": "zelda"}
+						]
+					}
+				]
+			}
+		}).then(()=>{console.log('Registered /sound on ['+guild.name+']')});
+		client.api.applications(client.user.id).guilds(guild.id).commands.post({
+			data: {
+				name: 'di',
+				description: 'Dice la frase enviada',
+				type: 3,
+				"options": [
+					{
+						"name": "frase",
+						"description": "La frase a decir",
+						"type": 3,
+						"required": true,
+					}
+				]
+			}
+		}).then(()=>{console.log('Registered /di on ['+guild.name+']')});
+		if (guilds[guild.id].hasTTSuntil>Math.floor(new Date().getTime() / 1000)) {
+			client.api.applications(client.user.id).guilds(guild.id).commands.post({
+				data: {
+					name: 'dipremium',
+					description: 'Dice la frase enviada utilizando servicio premium',
+					type: 3,
+					"options": [
+						{
+							"name": "frase",
+							"description": "La frase a decir",
+							"type": 3,
+							"required": true,
+						}
+					]
+				}
+			}).then(()=>{console.log('Registered /dipremium on ['+guild.name+']')});
+		}
 	});
 });
 client.on('voiceStateUpdate', async (oldState, newState) => {
@@ -467,11 +640,12 @@ client.on('voiceStateUpdate', async (oldState, newState) => {
 		}).catch( async (error) => {console.error; });
 	}
 });
-client.on('message', async message => {
-	if (!message.guild) return;
+client.ws.on('INTERACTION_CREATE', async interaction => {
+	answer = 'UNKNOWN ERROR!';
+	guild = await client.guilds.resolve(interaction.guild_id);
 	/* establecer variables de uso común */
-	var member = await message.channel.guild.members.fetch(message.author.id).catch( async (error) => {
-		return false;
+	var member = await guild.members.fetch(interaction.member.user.id).catch( async (error) => {
+		console.log(error)
 	});
 	if (member===false) {
 		return false;
@@ -482,167 +656,117 @@ client.on('message', async message => {
 			voiceChannel = channel;
 		}).catch( error => console.error );
 	}
-
-	// command processing
-	procesar = message.content.split(' ');
-	command = procesar[0];
-	procesar.shift();
-	parameter = procesar.join(' ');
-	switch (command.toLowerCase()) {
-		case guilds[message.guild.id].prefix+'burbuja':
-			quickBotReply(message,'Puedes invitarme a tu servidor con https://discord.com/oauth2/authorize?client_id=724218726190415902&scope=bot %s',parameter,'<@'+message.author.id+'>');
+	switch (interaction.data.name) {
+		case 'ping':
+			answer = 'yamete kudasai ರ_ರ';
 			break;
-		case guilds[message.guild.id].prefix+'trabajo':
-		case guilds[message.guild.id].prefix+'trabajo?': playSound(message.guild,voiceChannel,'./trabajo.ogg'); break;
-		case guilds[message.guild.id].prefix+'aracuan': playSound(message.guild,voiceChannel,'./sounds/aracuan.ogg'); break;
-		case guilds[message.guild.id].prefix+'hahaha': playSound(message.guild,voiceChannel,'./sounds/hahaha.ogg'); break;
-		case guilds[message.guild.id].prefix+'science': playSound(message.guild,voiceChannel,'./sounds/hahaha_science_is_hard.ogg'); break;
-		case guilds[message.guild.id].prefix+'anotherfag': playSound(message.guild,voiceChannel,'./sounds/anotherfag.ogg'); break;
-		case guilds[message.guild.id].prefix+'badumtss': playSound(message.guild,voiceChannel,'./sounds/badumtss.ogg'); break;
-		case guilds[message.guild.id].prefix+'crybaby': playSound(message.guild,voiceChannel,'./sounds/crybaby.ogg'); break;
-		case guilds[message.guild.id].prefix+'bokusatchii': playSound(message.guild,voiceChannel,'./sounds/bokusatchii.ogg'); break;
-		case guilds[message.guild.id].prefix+'brokenglass': playSound(message.guild,voiceChannel,'./sounds/brokenglass.ogg'); break;
-		case guilds[message.guild.id].prefix+'ogh': playSound(message.guild,voiceChannel,'./sounds/ogh.ogg'); break;
-		case guilds[message.guild.id].prefix+'catscreaming': playSound(message.guild,voiceChannel,'./sounds/catscreaming.ogg'); break;
-		case guilds[message.guild.id].prefix+'cryofthehawk': playSound(message.guild,voiceChannel,'./sounds/cryofthehawk.ogg'); break;
-		case guilds[message.guild.id].prefix+'gunshot': playSound(message.guild,voiceChannel,'./sounds/gunshot.ogg'); break;
-		case guilds[message.guild.id].prefix+'recordscratch': playSound(message.guild,voiceChannel,'./sounds/recordscratch.ogg'); break;
-		case guilds[message.guild.id].prefix+'facebookspam': playSound(message.guild,voiceChannel,'./sounds/facebookspam.ogg'); break;
-		case guilds[message.guild.id].prefix+'cuacuacua': playSound(message.guild,voiceChannel,'./sounds/cuacuacua.ogg'); break;
-		case guilds[message.guild.id].prefix+'mexicanfanfarrias': playSound(message.guild,voiceChannel,'./sounds/mexicanfanfarrias.ogg'); break;
-		case guilds[message.guild.id].prefix+'fuckyou': playSound(message.guild,voiceChannel,'./sounds/fuckyou.ogg'); break;
-		case guilds[message.guild.id].prefix+'fightsounds': playSound(message.guild,voiceChannel,'./sounds/fightsounds.ogg'); break;
-		case guilds[message.guild.id].prefix+'eslomasestupido': playSound(message.guild,voiceChannel,'./sounds/eslomasestupido.ogg'); break;
-		case guilds[message.guild.id].prefix+'jajaja': playSound(message.guild,voiceChannel,'./sounds/jajaja.ogg'); break;
-		case guilds[message.guild.id].prefix+'jejeje': playSound(message.guild,voiceChannel,'./sounds/jejeje.ogg'); break;
-		case guilds[message.guild.id].prefix+'jijiji': playSound(message.guild,voiceChannel,'./sounds/jijiji.ogg'); break;
-		case guilds[message.guild.id].prefix+'nononohahaha': playSound(message.guild,voiceChannel,'./sounds/nononohahaha.ogg'); break;
-		case guilds[message.guild.id].prefix+'wrongbuzzer': playSound(message.guild,voiceChannel,'./sounds/wrongbuzzer.ogg'); break;
-		case guilds[message.guild.id].prefix+'abathurscream': playSound(message.guild,voiceChannel,'./sounds/abathurscream.ogg'); break;
-		case guilds[message.guild.id].prefix+'gotchabitch': playSound(message.guild,voiceChannel,'./sounds/gotchabitch.ogg'); break;
-		case guilds[message.guild.id].prefix+'reloadgun': playSound(message.guild,voiceChannel,'./sounds/reloadgun.ogg'); break;
-		case guilds[message.guild.id].prefix+'gyaaaaaaa': playSound(message.guild,voiceChannel,'./sounds/gyaaaaaaa.ogg'); break;
-		case guilds[message.guild.id].prefix+'maniaclaugh': playSound(message.guild,voiceChannel,'./sounds/maniaclaugh.ogg'); break;
-		case guilds[message.guild.id].prefix+'headshot': playSound(message.guild,voiceChannel,'./sounds/headshot.ogg'); break;
-		case guilds[message.guild.id].prefix+'helpme': playSound(message.guild,voiceChannel,'./sounds/helpme.ogg'); break;
-		case guilds[message.guild.id].prefix+'horrorscream': playSound(message.guild,voiceChannel,'./sounds/horrorscream.ogg'); break;
-		case guilds[message.guild.id].prefix+'inception': playSound(message.guild,voiceChannel,'./sounds/inception.ogg'); break;
-		case guilds[message.guild.id].prefix+'johncena': playSound(message.guild,voiceChannel,'./sounds/johncena.ogg'); break;
-		case guilds[message.guild.id].prefix+'lol': playSound(message.guild,voiceChannel,'./sounds/lol.ogg'); break;
-		case guilds[message.guild.id].prefix+'dundundun': playSound(message.guild,voiceChannel,'./sounds/dundundun.ogg'); break;
-		case guilds[message.guild.id].prefix+'clickclick': playSound(message.guild,voiceChannel,'./sounds/clickclick.ogg'); break;
-		case guilds[message.guild.id].prefix+'mynameisjeff': playSound(message.guild,voiceChannel,'./sounds/mynameisjeff.ogg'); break;
-		case guilds[message.guild.id].prefix+'mistery': playSound(message.guild,voiceChannel,'./sounds/mistery.ogg'); break;
-		case guilds[message.guild.id].prefix+'pizzapasta': playSound(message.guild,voiceChannel,'./sounds/pizzapasta.ogg'); break;
-		case guilds[message.guild.id].prefix+'letmeout': playSound(message.guild,voiceChannel,'./sounds/letmeout.ogg'); break;
-		case guilds[message.guild.id].prefix+'run': playSound(message.guild,voiceChannel,'./sounds/run.ogg'); break;
-		case guilds[message.guild.id].prefix+'madscream': playSound(message.guild,voiceChannel,'./sounds/madscream.ogg'); break;
-		case guilds[message.guild.id].prefix+'shutup': playSound(message.guild,voiceChannel,'./sounds/shutup.ogg'); break;
-		case guilds[message.guild.id].prefix+'shutyourbitchassup': playSound(message.guild,voiceChannel,'./sounds/shutyourbitchassup.ogg'); break;
-		case guilds[message.guild.id].prefix+'snoring': playSound(message.guild,voiceChannel,'./sounds/snoring.ogg'); break;
-		case guilds[message.guild.id].prefix+'mexicanscanner': playSound(message.guild,voiceChannel,'./sounds/mexicanscanner.ogg'); break;
-		case guilds[message.guild.id].prefix+'veetealamierda': playSound(message.guild,voiceChannel,'./sounds/veetealamierda.ogg'); break;
-		case guilds[message.guild.id].prefix+'vetealamierda': playSound(message.guild,voiceChannel,'./sounds/vetealamierda.ogg'); break;
-		case guilds[message.guild.id].prefix+'ahvetealamierda': playSound(message.guild,voiceChannel,'./sounds/ahvetealamierda.ogg'); break;
-		case guilds[message.guild.id].prefix+'nonononononono': playSound(message.guild,voiceChannel,'./sounds/nonononononono.ogg'); break;
-		case guilds[message.guild.id].prefix+'ohvetealamierda': playSound(message.guild,voiceChannel,'./sounds/ohvetealamierda.ogg'); break;
-		case guilds[message.guild.id].prefix+'spinningcrystal': playSound(message.guild,voiceChannel,'./sounds/spinningcrystal.ogg'); break;
-		case guilds[message.guild.id].prefix+'pffthahaha': playSound(message.guild,voiceChannel,'./sounds/pffthahaha.ogg'); break;
-		case guilds[message.guild.id].prefix+'supermariocoin': playSound(message.guild,voiceChannel,'./sounds/supermariocoin.ogg'); break;
-		case guilds[message.guild.id].prefix+'surprisemotherfucker': playSound(message.guild,voiceChannel,'./sounds/surprisemotherfucker.ogg'); break;
-		case guilds[message.guild.id].prefix+'swish2': playSound(message.guild,voiceChannel,'./sounds/swish2.ogg'); break;
-		case guilds[message.guild.id].prefix+'swish': playSound(message.guild,voiceChannel,'./sounds/swish.ogg'); break;
-		case guilds[message.guild.id].prefix+'tiefighter': playSound(message.guild,voiceChannel,'./sounds/tiefighter.ogg'); break;
-		case guilds[message.guild.id].prefix+'titanicbad': playSound(message.guild,voiceChannel,'./sounds/titanicbad.ogg'); break;
-		case guilds[message.guild.id].prefix+'trompetaalarma': playSound(message.guild,voiceChannel,'./sounds/trompetaalarma.ogg'); break;
-		case guilds[message.guild.id].prefix+'trompeta': playSound(message.guild,voiceChannel,'./sounds/trompeta.ogg'); break;
-		case guilds[message.guild.id].prefix+'unowenwasher': playSound(message.guild,voiceChannel,'./sounds/unowenwasher.ogg'); break;
-		case guilds[message.guild.id].prefix+'whatisthat': playSound(message.guild,voiceChannel,'./sounds/whatisthat.ogg'); break;
-		case guilds[message.guild.id].prefix+'whosthatpokemon': playSound(message.guild,voiceChannel,'./sounds/whosthatpokemon.ogg'); break;
-		case guilds[message.guild.id].prefix+'werror': playSound(message.guild,voiceChannel,'./sounds/werror.ogg'); break;
-		case guilds[message.guild.id].prefix+'bruh': playSound(message.guild,voiceChannel,'./sounds/bruh.ogg'); break;
-		case guilds[message.guild.id].prefix+'wtf': playSound(message.guild,voiceChannel,'./sounds/wtf.ogg'); break;
-		case guilds[message.guild.id].prefix+'yourmom': playSound(message.guild,voiceChannel,'./sounds/yourmom.ogg'); break;
-		case guilds[message.guild.id].prefix+'zelda': playSound(message.guild,voiceChannel,'./sounds/zelda.ogg'); break;
-		case guilds[message.guild.id].prefix+'di':
-			if (guild_voice[message.guild.id]!==null) {
-				const textohablado = discordTTS.getVoiceStream(parameter,'es-US');
-				quickBotReply(message,'Ok %s!','<@'+message.author.id+'>');
-				playSound(message.guild,voiceChannel,textohablado);
-			} else {
-				quickBotReply(message,'Necesito estar en un canal %s!','<@'+message.author.id+'>');
-			}
+		case 'invite':
+			answer = 'Puedes invitarme a tu servidor con https://discord.com/oauth2/authorize?client_id='+client.user.id+'&scope=bot';
 			break;
-		case guilds[message.guild.id].prefix+'dipremium':
-			if (guild_voice[message.guild.id]!==null) {
-				if (guilds[message.guild.id].hasTTSuntil>Math.floor(new Date().getTime() / 1000)) {
-					const playFile = await GeneraVoz(parameter);
-					quickBotReply(message,'Ok %s!','<@'+message.author.id+'>');
-					playSound(message.guild,voiceChannel,playFile);
-				} else {
-					quickBotReply(message,'Es necesario tener el privilegio premium para este servidor %s!','<@'+message.author.id+'>');
+		case 'config':
+			if (member.hasPermission('ADMINISTRATOR')) {
+				for (i in interaction.data.options) {
+					if (interaction.data.options[i].name=='enabled') {
+						if (interaction.data.options[i].value) {
+							answer = 'Ok saludaré a todos';
+							guilds[guild.id].enabled = true;
+							break;
+						} else {
+							answer = '😢 ok dejaré de saludar a todos';
+							if (guild_voice[guild.id]!==null&&guild_voice[guild.id]!==undefined) {
+								guild_voice[guild.id].disconnect();
+								guild_voice_status[guild.id] = false;
+							}
+							guilds[guild.id].enabled = false;
+							break;
+						}
+					}
+					if (interaction.data.options[i].name=='names') {
+						if (interaction.data.options[i].value) {
+							answer = 'Ok mencionaré los nombres';
+							guilds[guild.id].sayNames = true;
+							break;
+						} else {
+							answer = 'Ok ya no mencionaré los nombres';
+							guilds[guild.id].sayNames = false;
+							break;
+						}
+					}
+					if (interaction.data.options[i].name=='states') {
+						if (interaction.data.options[i].value) {
+							answer = 'Ok mencionaré los estado';
+							guilds[guild.id].sayStatus = true;
+							break;
+						} else {
+							answer = 'Ok ya no mencionaré los estado';
+							guilds[guild.id].sayStatus = false;
+							break;
+						}
+					}
 				}
 			} else {
-				quickBotReply(message,'Necesito estar en un canal %s!','<@'+message.author.id+'>');
+				answer = 'no tienes privilegios de administrador';
 			}
+			break;
+		case 'sound':
+			for (i in interaction.data.options) {
+				sound = null;
+				if (
+					  interaction.data.options[i].name=='efectos1'
+					||interaction.data.options[i].name=='efectos2'
+					||interaction.data.options[i].name=='efectos2'
+					) {
+					sound = interaction.data.options[i].value;
+				}
+				playSound(guild,voiceChannel,'./sounds/'+sound+'.ogg');
+				answer = 'Correcto ('+sound+')';
+				break;
+			}
+			break;
+		case 'di':
+			if (guild_voice[guild.id]===null) {
+				answer = 'Necesito estar en un canal';
+				break;
+			}
+			const textohablado = discordTTS.getVoiceStream(parameter,'es-US');
+			answer = 'Ok ('+frase+')';
+			playSound(guild,voiceChannel,textohablado);
+			break;
+		case 'dipremium':
+			frase = null;
+			for (i in interaction.data.options) {
+				if (interaction.data.options[i].name=='frase') {
+					frase = interaction.data.options[i].value;
+				}
+			}
+			if (guild_voice[guild.id]===null) {
+				answer = 'Necesito estar en un canal';
+				break;
+			}
+			if (frase===null) {
+				answer = 'Es necesario definir una frase!';
+				break;
+			}
+			if (guilds[guild.id].hasTTSuntil<Math.floor(new Date().getTime() / 1000)) {
+				answer = 'Es necesario tener el privilegio premium para este servidor';
+				break;
+			}
+			const playFile = await GeneraVoz(frase);
+			answer = 'Correcto! ('+frase+')';
+			playSound(guild,voiceChannel,playFile);
+			break;
+		default:
+			answer = 'UNKNOWN COMMAND!';
 			break;
 	}
-	if (member.hasPermission('ADMINISTRATOR')) {
-	//if (message.member!==null&&message.member.hasPermission('ADMINISTRATOR')) {
-		switch (command.toLowerCase()) {
-			case 'dumpcomnfig2020':
-				quickBotReply(message,'Actualmente: '+JSON.stringify(guilds[message.guild.id]));
-				break;
-			case 'dumpvoicecurrent2020':
-				quickBotReply(message,'VOZ CURRENT: TypeError: Converting circular structure to JSON');
-				break;
-			case 'rem':
-				if (parameter.length>0) {
-					quickBotReply(message,'SUCCESSFUL');
-				}
-				break;
-			case guilds[message.guild.id].prefix+'audioQueue':
-				console.log('['+toPlay.guild.name+'] Manual audioQueue()');
-				audioQueue(guild,guild_voice_queue[guild.id]);
-				break;
-			case guilds[message.guild.id].prefix+'prefix':
-				if (parameter.length>0) {
-					quickBotReply(message,'He cambiado mi prefix a %s, %s',parameter,'<@'+message.author.id+'>');
-					guilds[message.guild.id].prefix = parameter.toLowerCase();
-				} else {
-					quickBotReply(message,'El prefix tiene que ser de al menos 1 carácter %s','<@'+message.author.id+'>');
-				}
-				break;
-			case guilds[message.guild.id].prefix+'encender':
-				quickBotReply(message,'Ok saludaré a todos %s!','<@'+message.author.id+'>');
-				guilds[message.guild.id].enabled = true;
-				break;
-			case guilds[message.guild.id].prefix+'apagar':
-				quickBotReply(message,'😢 ok dejaré de saludar a todos %s!','<@'+message.author.id+'>');
-				if (guild_voice[message.guild.id]!==null&&guild_voice[message.guild.id]!==undefined) {
-					guild_voice[message.guild.id].disconnect();
-					guild_voice_status[message.guild.id] = false;
-				}
-				guilds[message.guild.id].enabled = false;
-				break;
-			case guilds[message.guild.id].prefix+'connombre':
-				quickBotReply(message,'Ok mencionaré los nombres %s!','<@'+message.author.id+'>');
-				guilds[message.guild.id].sayNames = true;
-				break;
-			case guilds[message.guild.id].prefix+'sinnombre':
-				quickBotReply(message,'Ok ya no mencionaré los nombres %s!','<@'+message.author.id+'>');
-				guilds[message.guild.id].sayNames = false;
-				break;
-			case guilds[message.guild.id].prefix+'conestado':
-				quickBotReply(message,'Ok mencionaré los estado %s!','<@'+message.author.id+'>');
-				guilds[message.guild.id].sayStatus = true;
-				break;
-			case guilds[message.guild.id].prefix+'sinestado':
-				quickBotReply(message,'Ok ya no mencionaré los estado %s!','<@'+message.author.id+'>');
-				guilds[message.guild.id].sayStatus = false;
-				break;
+	client.api.interactions(interaction.id, interaction.token).callback.post({
+		data: {
+			type: 4,
+			data: {
+				content: answer
+			}
 		}
-	}
+	});
 });
 process.on('SIGINT',async () => {
 	console.log('Caught interrupt signal');
