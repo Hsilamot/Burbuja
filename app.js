@@ -4,13 +4,36 @@ const environment = process.env.NODE_ENV || 'development';
 const config = Object.assign(configjson['development'], configjson[environment]);
 const util = require('util');
 var crypto = require('crypto');
-const Discord = require('discord.js');
+const { Client, Collection, Intents } = require('discord.js');
 const discordTTS = require('discord-tts');
 const GoogleCloudTextToSpeech = require('@google-cloud/text-to-speech');
 const ObservableSlim = require('observable-slim');
 const { getAudioDurationInSeconds } = require('get-audio-duration');
-const client = new Discord.Client(config.DiscordClient);
-var touch = require("touch")
+var touch = require("touch");
+const { REST } = require('@discordjs/rest');
+const { Routes } = require('discord-api-types/v9');
+
+const myIntents = new Intents();
+myIntents.add(Intents.FLAGS.GUILDS);
+myIntents.add(Intents.FLAGS.GUILD_MEMBERS);
+myIntents.add(Intents.FLAGS.GUILD_BANS);
+myIntents.add(Intents.FLAGS.GUILD_EMOJIS_AND_STICKERS);
+myIntents.add(Intents.FLAGS.GUILD_INTEGRATIONS);
+myIntents.add(Intents.FLAGS.GUILD_WEBHOOKS);
+myIntents.add(Intents.FLAGS.GUILD_INVITES);
+myIntents.add(Intents.FLAGS.GUILD_VOICE_STATES);
+myIntents.add(Intents.FLAGS.GUILD_PRESENCES);
+myIntents.add(Intents.FLAGS.GUILD_MESSAGES);
+myIntents.add(Intents.FLAGS.GUILD_MESSAGE_REACTIONS);
+myIntents.add(Intents.FLAGS.GUILD_MESSAGE_TYPING);
+myIntents.add(Intents.FLAGS.GUILD_VOICE_STATES);
+myIntents.add(Intents.FLAGS.DIRECT_MESSAGES);
+myIntents.add(Intents.FLAGS.DIRECT_MESSAGE_REACTIONS);
+myIntents.add(Intents.FLAGS.DIRECT_MESSAGE_TYPING);
+
+config.DiscordClient.intents = myIntents;
+console.log(config.DiscordClient);
+const client = new Client(config.DiscordClient);
 
 var guilds_data = {};
 var guilds = ObservableSlim.create(guilds_data, true, function(changes) {
@@ -29,6 +52,16 @@ var guilds = ObservableSlim.create(guilds_data, true, function(changes) {
 });
 
 const googleTTS = new GoogleCloudTextToSpeech.TextToSpeechClient(config.GoogleTTS);
+
+const rest = new REST({ version: '9' }).setToken(config.Token);
+client.commands = new Collection();
+const comandos = [];
+const comandosFiles = fs.readdirSync('./comandos').filter(file => file.endsWith('.js'));
+for (const file of comandosFiles) {
+	const comando = require(`./comandos/${file}`);
+	comandos.push(comando.data.toJSON());
+	client.commands.set(comando.data.name, comando);
+}
 
 async function GeneraVoz(textoaconvertir) {
 	const request = Object.assign(config.GoogleTTS.templateObject,
@@ -343,220 +376,226 @@ async function notifyChannel(guild,channel,member,type) {
 	}
 }
 
-client.on('guildCreate', guild => {
-	console.log('Me he unido a ' + guild.name);
-	const defaultGuildConfig = require('./guilds/default.json');
+async function loadGuild(guild) {
+	console.log(guild.id+' ['+guild.name+'] Loading...');
 	if (fs.existsSync('./guilds/'+guild.id+'.json')) {
-		guilds_data[guild.id] = Object.assign({}, defaultGuildConfig);
+		guilds_data[guild.id] = Object.assign({}, require('./guilds/default.json'));
 		guilds_data[guild.id] = Object.assign(guilds_data[guild.id], require('./guilds/'+guild.id+'.json'));
 	} else {
-		guilds_data[guild.id] = require('./guilds/default.json');
+		guilds_data[guild.id] = Object.assign({}, require('./guilds/default.json'));
+		guilds[guild.id].joined = Math.floor(new Date().getTime() / 1000);
 	}
 	guild_voice[guild.id] = null;
 	guild_voice_queue[guild.id] = [];
 	guild_voice_queue_executing[guild.id] = false;
 	guild_voice_status[guild.id] = false;
-})
-client.on('guildDelete', guild => {
-	console.log('He abandonado ' + guild.name);
-})
-client.on('error', () => {console.error});
-client.on('ready', () => {
-	console.log(`Logged in as ${client.user.tag}!`);
-	console.log('Retrieving guilds...');
-	const defaultGuildConfig = require('./guilds/default.json');
-	client.guilds.cache.forEach((guild) => {
-		console.log('Loading... ./guilds/'+guild.id+'.json ['+guild.name+']');
-		if (fs.existsSync('./guilds/'+guild.id+'.json')) {
-			guilds_data[guild.id] = Object.assign({}, defaultGuildConfig);
-			guilds_data[guild.id] = Object.assign(guilds_data[guild.id], require('./guilds/'+guild.id+'.json'));
-		} else {
-			guilds_data[guild.id] = require('./guilds/default.json');
+	/*
+	client.api.applications(client.user.id).guilds(guild.id).commands.post({
+		data: {
+			name: 'ping',
+			description: 'No me toques ahi ( •_•)σ'
 		}
-		guild_voice[guild.id] = null;
-		guild_voice_queue[guild.id] = [];
-		guild_voice_queue_executing[guild.id] = false;
-		guild_voice_status[guild.id] = false;
+	}).then(()=>{console.log(guild.id+' ['+guild.name+'] Registered /ping')})
+	.catch((error) => console.log(error));
+	client.api.applications(client.user.id).guilds(guild.id).commands.post({
+		data: {
+			name: 'invite',
+			description: 'obtener link de invitación para burbuja'
+		}
+	}).then(()=>{console.log(guild.id+' ['+guild.name+'] Registered /invite')})
+	.catch((error) => console.log(error));
+	client.api.applications(client.user.id).guilds(guild.id).commands.post({
+		data: {
+			name: 'config',
+			description: 'Configuraciones',
+			"options": [
+				{
+					"name": "enabled",
+					"description": "Define si entraré o no a los canales para saludar",
+					"type": 5,
+					"required": false,
+				}
+				,{
+					"name": "names",
+					"description": "Define si anexaré o no el nombre de la persona que generó la notificación",
+					"type": 5,
+					"required": false,
+				}
+				,{
+					"name": "states",
+					"description": "Define si notificaré o no cambios de estado (Muteos, desmuteos, etc)",
+					"type": 5,
+					"required": false,
+				}
+			]
+		}
+	}).then(()=>{console.log(guild.id+' ['+guild.name+'] Registered /config')})
+	.catch((error) => console.log(error));
+	client.api.applications(client.user.id).guilds(guild.id).commands.post({
+		data: {
+			name: 'sound',
+			description: 'Emite un efecto de audio',
+			"options": [
+				{
+					"name": "efectos1",
+					"description": "Escoje un sonido de la lista",
+					"type": 3,
+					"required": false,
+					"choices": [
+							{"name": "abathurscream (Extender Descripción)","value": "abathurscream"}
+						,{"name": "ahvetealamierda (Extender Descripción)","value": "ahvetealamierda"}
+						,{"name": "anotherfag (Extender Descripción)","value": "anotherfag"}
+						,{"name": "aracuan (Extender Descripción)","value": "aracuan"}
+						,{"name": "badumtss (Extender Descripción)","value": "badumtss"}
+						,{"name": "bokusatchii (Extender Descripción)","value": "bokusatchii"}
+						,{"name": "brokenglass (Extender Descripción)","value": "brokenglass"}
+						,{"name": "bruh (Extender Descripción)","value": "bruh"}
+						,{"name": "catscreaming (Extender Descripción)","value": "catscreaming"}
+						,{"name": "clickclick (Extender Descripción)","value": "clickclick"}
+						,{"name": "crybaby (Extender Descripción)","value": "crybaby"}
+						,{"name": "cryofthehawk (Extender Descripción)","value": "cryofthehawk"}
+						,{"name": "cuacuacua (Extender Descripción)","value": "cuacuacua"}
+						,{"name": "dundundun (Extender Descripción)","value": "dundundun"}
+						,{"name": "eslomasestupido (Extender Descripción)","value": "eslomasestupido"}
+						,{"name": "facebookspam (Extender Descripción)","value": "facebookspam"}
+						,{"name": "fightsounds (Extender Descripción)","value": "fightsounds"}
+						,{"name": "fuckyou (Extender Descripción)","value": "fuckyou"}
+						,{"name": "gotchabitch (Extender Descripción)","value": "gotchabitch"}
+						,{"name": "gunshot (Extender Descripción)","value": "gunshot"}
+						,{"name": "gyaaaaaaa (Extender Descripción)","value": "gyaaaaaaa"}
+						,{"name": "hahaha (Extender Descripción)","value": "hahaha"}
+						,{"name": "headshot (Extender Descripción)","value": "headshot"}
+						,{"name": "helpme (Extender Descripción)","value": "helpme"}
+						,{"name": "horrorscream (Extender Descripción)","value": "horrorscream"}
+					]
+				}
+				,{
+					"name": "efectos2",
+					"description": "Escoje un sonido de la lista",
+					"type": 3,
+					"required": false,
+					"choices": [
+							{"name": "inception (Extender Descripción)","value": "inception"}
+						,{"name": "jajaja (Extender Descripción)","value": "jajaja"}
+						,{"name": "jejeje (Extender Descripción)","value": "jejeje"}
+						,{"name": "jijiji (Extender Descripción)","value": "jijiji"}
+						,{"name": "johncena (Extender Descripción)","value": "johncena"}
+						,{"name": "letmeout (Extender Descripción)","value": "letmeout"}
+						,{"name": "lol (Extender Descripción)","value": "lol"}
+						,{"name": "madscream (Extender Descripción)","value": "madscream"}
+						,{"name": "maniaclaugh (Extender Descripción)","value": "maniaclaugh"}
+						,{"name": "mexicanfanfarrias (Extender Descripción)","value": "mexicanfanfarrias"}
+						,{"name": "mexicanscanner (Extender Descripción)","value": "mexicanscanner"}
+						,{"name": "mistery (Extender Descripción)","value": "mistery"}
+						,{"name": "mynameisjeff (Extender Descripción)","value": "mynameisjeff"}
+						,{"name": "nononohahaha (Extender Descripción)","value": "nononohahaha"}
+						,{"name": "nonononononono (Extender Descripción)","value": "nonononononono"}
+						,{"name": "ogh (Extender Descripción)","value": "ogh"}
+						,{"name": "ohvetealamierda (Extender Descripción)","value": "ohvetealamierda"}
+						,{"name": "pffthahaha (Extender Descripción)","value": "pffthahaha"}
+						,{"name": "pizzapasta (Extender Descripción)","value": "pizzapasta"}
+						,{"name": "recordscratch (Extender Descripción)","value": "recordscratch"}
+						,{"name": "reloadgun (Extender Descripción)","value": "reloadgun"}
+						,{"name": "run (Extender Descripción)","value": "run"}
+						,{"name": "science (Extender Descripción)","value": "science"}
+						,{"name": "shutup (Extender Descripción)","value": "shutup"}
+						,{"name": "shutyourbitchassup (Extender Descripción)","value": "shutyourbitchassup"}
+					]
+				}
+				,{
+					"name": "efectos3",
+					"description": "Escoje un sonido de la lista",
+					"type": 3,
+					"required": false,
+					"choices": [
+							{"name": "snoring (Extender Descripción)","value": "snoring"}
+						,{"name": "spinningcrystal (Extender Descripción)","value": "spinningcrystal"}
+						,{"name": "supermariocoin (Extender Descripción)","value": "supermariocoin"}
+						,{"name": "surprisemotherfucker (Extender Descripción)","value": "surprisemotherfucker"}
+						,{"name": "swish (Extender Descripción)","value": "swish"}
+						,{"name": "swish2 (Extender Descripción)","value": "swish2"}
+						,{"name": "tiefighter (Extender Descripción)","value": "tiefighter"}
+						,{"name": "titanicbad (Extender Descripción)","value": "titanicbad"}
+						,{"name": "trabajo (Extender Descripción)","value": "trabajo"}
+						,{"name": "trompeta (Extender Descripción)","value": "trompeta"}
+						,{"name": "trompetaalarma (Extender Descripción)","value": "trompetaalarma"}
+						,{"name": "unowenwasher (Extender Descripción)","value": "unowenwasher"}
+						,{"name": "veetealamierda (Extender Descripción)","value": "veetealamierda"}
+						,{"name": "vetealamierda (Extender Descripción)","value": "vetealamierda"}
+						,{"name": "werror (Extender Descripción)","value": "werror"}
+						,{"name": "whatisthat (Extender Descripción)","value": "whatisthat"}
+						,{"name": "whosthatpokemon (Extender Descripción)","value": "whosthatpokemon"}
+						,{"name": "wrongbuzzer (Extender Descripción)","value": "wrongbuzzer"}
+						,{"name": "wtf (Extender Descripción)","value": "wtf"}
+						,{"name": "yourmom (Extender Descripción)","value": "yourmom"}
+						,{"name": "zelda (Extender Descripción)","value": "zelda"}
+					]
+				}
+			]
+		}
+	}).then(()=>{console.log(guild.id+' ['+guild.name+'] Registered /sound')})
+	.catch((error) => console.log(error));
+	client.api.applications(client.user.id).guilds(guild.id).commands.post({
+		data: {
+			name: 'di',
+			description: 'Dice la frase enviada',
+			type: 3,
+			"options": [
+				{
+					"name": "frase",
+					"description": "La frase a decir",
+					"type": 3,
+					"required": true,
+				}
+			]
+		}
+	}).then(()=>{console.log(guild.id+' ['+guild.name+'] Registered /di')})
+	.catch((error) => console.log(error));
+	if (guilds[guild.id].hasTTSuntil>Math.floor(new Date().getTime() / 1000)) {
 		client.api.applications(client.user.id).guilds(guild.id).commands.post({
 			data: {
-				name: 'ping',
-				description: 'No me toques ahi ( •_•)σ'
-			}
-		}).then(()=>{console.log('Registered /ping on ['+guild.name+']')})
-		.catch((error) => console.log(error));
-		client.api.applications(client.user.id).guilds(guild.id).commands.post({
-			data: {
-				name: 'invite',
-				description: 'obtener link de invitación para burbuja'
-			}
-		}).then(()=>{console.log('Registered /invite on ['+guild.name+']')})
-		.catch((error) => console.log(error));
-		client.api.applications(client.user.id).guilds(guild.id).commands.post({
-			data: {
-				name: 'config',
-				description: 'Configuraciones',
-				"options": [
-					{
-						"name": "enabled",
-						"description": "Define si entraré o no a los canales para saludar",
-						"type": 5,
-						"required": false,
-					}
-					,{
-						"name": "names",
-						"description": "Define si anexaré o no el nombre de la persona que generó la notificación",
-						"type": 5,
-						"required": false,
-					}
-					,{
-						"name": "states",
-						"description": "Define si notificaré o no cambios de estado (Muteos, desmuteos, etc)",
-						"type": 5,
-						"required": false,
-					}
-				]
-			}
-		}).then(()=>{console.log('Registered /config on ['+guild.name+']')})
-		.catch((error) => console.log(error));
-		client.api.applications(client.user.id).guilds(guild.id).commands.post({
-			data: {
-				name: 'sound',
-				description: 'Emite un efecto de audio',
-				"options": [
-					{
-						"name": "efectos1",
-						"description": "Escoje un sonido de la lista",
-						"type": 3,
-						"required": false,
-						"choices": [
-							 {"name": "abathurscream (Extender Descripción)","value": "abathurscream"}
-							,{"name": "ahvetealamierda (Extender Descripción)","value": "ahvetealamierda"}
-							,{"name": "anotherfag (Extender Descripción)","value": "anotherfag"}
-							,{"name": "aracuan (Extender Descripción)","value": "aracuan"}
-							,{"name": "badumtss (Extender Descripción)","value": "badumtss"}
-							,{"name": "bokusatchii (Extender Descripción)","value": "bokusatchii"}
-							,{"name": "brokenglass (Extender Descripción)","value": "brokenglass"}
-							,{"name": "bruh (Extender Descripción)","value": "bruh"}
-							,{"name": "catscreaming (Extender Descripción)","value": "catscreaming"}
-							,{"name": "clickclick (Extender Descripción)","value": "clickclick"}
-							,{"name": "crybaby (Extender Descripción)","value": "crybaby"}
-							,{"name": "cryofthehawk (Extender Descripción)","value": "cryofthehawk"}
-							,{"name": "cuacuacua (Extender Descripción)","value": "cuacuacua"}
-							,{"name": "dundundun (Extender Descripción)","value": "dundundun"}
-							,{"name": "eslomasestupido (Extender Descripción)","value": "eslomasestupido"}
-							,{"name": "facebookspam (Extender Descripción)","value": "facebookspam"}
-							,{"name": "fightsounds (Extender Descripción)","value": "fightsounds"}
-							,{"name": "fuckyou (Extender Descripción)","value": "fuckyou"}
-							,{"name": "gotchabitch (Extender Descripción)","value": "gotchabitch"}
-							,{"name": "gunshot (Extender Descripción)","value": "gunshot"}
-							,{"name": "gyaaaaaaa (Extender Descripción)","value": "gyaaaaaaa"}
-							,{"name": "hahaha (Extender Descripción)","value": "hahaha"}
-							,{"name": "headshot (Extender Descripción)","value": "headshot"}
-							,{"name": "helpme (Extender Descripción)","value": "helpme"}
-							,{"name": "horrorscream (Extender Descripción)","value": "horrorscream"}
-						]
-					}
-					,{
-						"name": "efectos2",
-						"description": "Escoje un sonido de la lista",
-						"type": 3,
-						"required": false,
-						"choices": [
-							 {"name": "inception (Extender Descripción)","value": "inception"}
-							,{"name": "jajaja (Extender Descripción)","value": "jajaja"}
-							,{"name": "jejeje (Extender Descripción)","value": "jejeje"}
-							,{"name": "jijiji (Extender Descripción)","value": "jijiji"}
-							,{"name": "johncena (Extender Descripción)","value": "johncena"}
-							,{"name": "letmeout (Extender Descripción)","value": "letmeout"}
-							,{"name": "lol (Extender Descripción)","value": "lol"}
-							,{"name": "madscream (Extender Descripción)","value": "madscream"}
-							,{"name": "maniaclaugh (Extender Descripción)","value": "maniaclaugh"}
-							,{"name": "mexicanfanfarrias (Extender Descripción)","value": "mexicanfanfarrias"}
-							,{"name": "mexicanscanner (Extender Descripción)","value": "mexicanscanner"}
-							,{"name": "mistery (Extender Descripción)","value": "mistery"}
-							,{"name": "mynameisjeff (Extender Descripción)","value": "mynameisjeff"}
-							,{"name": "nononohahaha (Extender Descripción)","value": "nononohahaha"}
-							,{"name": "nonononononono (Extender Descripción)","value": "nonononononono"}
-							,{"name": "ogh (Extender Descripción)","value": "ogh"}
-							,{"name": "ohvetealamierda (Extender Descripción)","value": "ohvetealamierda"}
-							,{"name": "pffthahaha (Extender Descripción)","value": "pffthahaha"}
-							,{"name": "pizzapasta (Extender Descripción)","value": "pizzapasta"}
-							,{"name": "recordscratch (Extender Descripción)","value": "recordscratch"}
-							,{"name": "reloadgun (Extender Descripción)","value": "reloadgun"}
-							,{"name": "run (Extender Descripción)","value": "run"}
-							,{"name": "science (Extender Descripción)","value": "science"}
-							,{"name": "shutup (Extender Descripción)","value": "shutup"}
-							,{"name": "shutyourbitchassup (Extender Descripción)","value": "shutyourbitchassup"}
-						]
-					}
-					,{
-						"name": "efectos3",
-						"description": "Escoje un sonido de la lista",
-						"type": 3,
-						"required": false,
-						"choices": [
-							 {"name": "snoring (Extender Descripción)","value": "snoring"}
-							,{"name": "spinningcrystal (Extender Descripción)","value": "spinningcrystal"}
-							,{"name": "supermariocoin (Extender Descripción)","value": "supermariocoin"}
-							,{"name": "surprisemotherfucker (Extender Descripción)","value": "surprisemotherfucker"}
-							,{"name": "swish (Extender Descripción)","value": "swish"}
-							,{"name": "swish2 (Extender Descripción)","value": "swish2"}
-							,{"name": "tiefighter (Extender Descripción)","value": "tiefighter"}
-							,{"name": "titanicbad (Extender Descripción)","value": "titanicbad"}
-							,{"name": "trabajo (Extender Descripción)","value": "trabajo"}
-							,{"name": "trompeta (Extender Descripción)","value": "trompeta"}
-							,{"name": "trompetaalarma (Extender Descripción)","value": "trompetaalarma"}
-							,{"name": "unowenwasher (Extender Descripción)","value": "unowenwasher"}
-							,{"name": "veetealamierda (Extender Descripción)","value": "veetealamierda"}
-							,{"name": "vetealamierda (Extender Descripción)","value": "vetealamierda"}
-							,{"name": "werror (Extender Descripción)","value": "werror"}
-							,{"name": "whatisthat (Extender Descripción)","value": "whatisthat"}
-							,{"name": "whosthatpokemon (Extender Descripción)","value": "whosthatpokemon"}
-							,{"name": "wrongbuzzer (Extender Descripción)","value": "wrongbuzzer"}
-							,{"name": "wtf (Extender Descripción)","value": "wtf"}
-							,{"name": "yourmom (Extender Descripción)","value": "yourmom"}
-							,{"name": "zelda (Extender Descripción)","value": "zelda"}
-						]
-					}
-				]
-			}
-		}).then(()=>{console.log('Registered /sound on ['+guild.name+']')})
-		.catch((error) => console.log(error));
-		client.api.applications(client.user.id).guilds(guild.id).commands.post({
-			data: {
-				name: 'di',
-				description: 'Dice la frase enviada',
+				name: 'dipremium',
+				description: 'Dice la frase enviada utilizando servicio premium',
 				type: 3,
 				"options": [
 					{
 						"name": "frase",
 						"description": "La frase a decir",
 						"type": 3,
-						"required": true,
+						"required": true
 					}
 				]
 			}
-		}).then(()=>{console.log('Registered /di on ['+guild.name+']')})
+		}).then(()=>{console.log(guild.id+' ['+guild.name+'] Registered /dipremium')})
 		.catch((error) => console.log(error));
-		if (guilds[guild.id].hasTTSuntil>Math.floor(new Date().getTime() / 1000)) {
-			client.api.applications(client.user.id).guilds(guild.id).commands.post({
-				data: {
-					name: 'dipremium',
-					description: 'Dice la frase enviada utilizando servicio premium',
-					type: 3,
-					"options": [
-						{
-							"name": "frase",
-							"description": "La frase a decir",
-							"type": 3,
-							"required": true,
-						}
-					]
-				}
-			}).then(()=>{console.log('Registered /dipremium on ['+guild.name+']')})
-			.catch((error) => console.log(error));
-		}
+	}
+	*/
+}
+
+client.on('guildCreate', guild => {
+	loadGuild(guild);
+})
+client.on('guildDelete', guild => {
+	console.log('He abandonado ' + guild.name);
+})
+client.on('error', () => {console.error});
+client.on('ready', async () => {
+	console.log(`Logged in as ${client.user.tag}!`);
+	console.log('Retrieving guilds...');
+	client.guilds.cache.forEach((guild) => {
+		loadGuild(guild);
 	});
+	try {
+		console.log('Started refreshing application (/) commands.');
+		await rest.put(
+			Routes.applicationCommands(client.user.id),
+			{ body: comandos },
+		);
+		console.log('Successfully reloaded application (/) commands.');
+	} catch (error) {
+		console.error(error);
+	}
+	
 });
 client.on('voiceStateUpdate', async (oldState, newState) => {
 	//console.log('oldState',util.inspect(oldState, {showHidden: false, depth: 0}));
@@ -646,7 +685,22 @@ client.on('voiceStateUpdate', async (oldState, newState) => {
 		}).catch( async (error) => {console.error; });
 	}
 });
-client.ws.on('INTERACTION_CREATE', async interaction => {
+client.on('stateChange', (oldState, newState) => {
+	console.log(`Connection transitioned from ${oldState.status} to ${newState.status}`);
+});
+client.on('interactionCreate', async interaction => {
+	if (!interaction.isCommand()) return;
+	const comando = client.commands.get(interaction.commandName);
+	if (!comando) return;
+	try {
+		await comando.execute(interaction);
+	} catch (error) {
+		console.error(error);
+		await interaction.reply({ content: 'Ocurrio un error al ejecutar el comando', ephemeral: true });
+	}
+});
+
+client.ws.on('INTERACTION_CREATEX', async interaction => {
 	answer = 'UNKNOWN ERROR!';
 	guild = await client.guilds.resolve(interaction.guild_id);
 	/* establecer variables de uso común */
@@ -720,7 +774,7 @@ client.ws.on('INTERACTION_CREATE', async interaction => {
 				if (
 					  interaction.data.options[i].name=='efectos1'
 					||interaction.data.options[i].name=='efectos2'
-					||interaction.data.options[i].name=='efectos2'
+					||interaction.data.options[i].name=='efectos3'
 					) {
 					sound = interaction.data.options[i].value;
 				}
@@ -730,11 +784,17 @@ client.ws.on('INTERACTION_CREATE', async interaction => {
 			}
 			break;
 		case 'di':
-			if (guild_voice[guild.id]===null) {
-				answer = 'Necesito estar en un canal';
+			frase = null;
+			for (i in interaction.data.options) {
+				if (interaction.data.options[i].name=='frase') {
+					frase = interaction.data.options[i].value;
+				}
+			}
+			if (frase===null) {
+				answer = 'Es necesario definir una frase!';
 				break;
 			}
-			const textohablado = discordTTS.getVoiceStream(parameter,'es-US');
+			const textohablado = discordTTS.getVoiceStream(frase,'es-US');
 			answer = 'Ok ('+frase+')';
 			playSound(guild,voiceChannel,textohablado);
 			break;
@@ -744,10 +804,6 @@ client.ws.on('INTERACTION_CREATE', async interaction => {
 				if (interaction.data.options[i].name=='frase') {
 					frase = interaction.data.options[i].value;
 				}
-			}
-			if (guild_voice[guild.id]===null) {
-				answer = 'Necesito estar en un canal';
-				break;
 			}
 			if (frase===null) {
 				answer = 'Es necesario definir una frase!';
