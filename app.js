@@ -12,6 +12,7 @@ const { getAudioDurationInSeconds } = require('get-audio-duration');
 var touch = require("touch");
 const { REST } = require('@discordjs/rest');
 const { Routes } = require('discord-api-types/v9');
+const { joinVoiceChannel, createAudioPlayer, NoSubscriberBehavior, getVoiceConnection, VoiceConnectionStatus, createAudioResource } = require('@discordjs/voice');
 
 const myIntents = new Intents();
 myIntents.add(Intents.FLAGS.GUILDS);
@@ -113,74 +114,30 @@ let guild_voice_queue_executing = {};
 
 async function joinChannel(guild,channel) {
 	if (!guilds[guild.id].enabled) { return false; }
-	return new Promise(async (resolve,reject) => {
-		if (guild_voice[guild.id]!==null) {
-			if (guild_voice[guild.id].channel.id!==channel.id) {
-				await channel.join().then(async (voz) => {
-					console.log('['+guild.name+'] SWITCHED --> '+channel.id+' ('+channel.name+')');
-					setTimeout(() => {
-						resolve('Connected!');
-					},500);
-				}).catch( (error) => {
-					console.log('['+guild.name+'] joinChannel ERROR ON SWITCH',error);
-					channel.leave();
-					setTimeout(() => {
-						reject('Error on Join!');
-					},200);
-				});
-			} else {
-				resolve('Already Connected!');
-			}
-		}
-		if (guild_voice[guild.id]===null) {
+	const current_connection = getVoiceConnection(guild.id);
+	if (typeof current_connection==='undefined') {
+		console.log('['+guild.name+'] JOIN --> '+channel.id+' ('+channel.name+')');
+		const connection = await joinVoiceChannel({
+			channelId: channel.id,
+			guildId: guild.id,
+			adapterCreator: guild.voiceAdapterCreator,
+		});
+		guild_voice[guild.id] = connection;
+		guild_voice_status[guild.id] = false;
+		console.log('['+guild.name+'] JOINED --> '+channel.id+' ('+channel.name+')');
+	} else {
+		if (current_connection.joinConfig.channelId!==channel.id) {
 			console.log('['+guild.name+'] JOIN --> '+channel.id+' ('+channel.name+')');
-			await channel.join().then(async (voz) => {
-				console.log('['+guild.name+'] '+channel.id+' ('+channel.name+') Binding...');
-				voz.on('disconnect',disconnect => {
-					console.log('['+guild.name+'] voz.DISCONNECTED');
-				});
-				voz.on('newSession',newSession => {
-					console.log('['+guild.name+'] voz.newSession',newSession);
-				});
-				voz.on('reconnecting',reconnecting => {
-					console.log('['+guild.name+'] voz.MOVED TO '+voz.channel.id+' ('+voz.channel.name+')');
-				});
-				voz.on('warn',warn => {
-					console.log('['+guild.name+'] voz.warn',warn);
-				});
-				voz.on('failed',failed => {
-					console.log('['+guild.name+'] voz.failed',failed);
-				});
-				voz.on('authenticated',authenticated => {
-					console.log('['+guild.name+'] voz.authenticated',authenticated);
-				});
-				voz.on('ready', error => {
-					resolve('Voz Ready!');
-				});
-				voz.on('error', error => {
-					console.log('['+guild.name+'] voz.error',error);
-				});
-				guild_voice[guild.id] = voz;
-				guild_voice_status[guild.id] = false;
-				setTimeout(() => {
-					resolve('Connected!');
-				},500);
-			}).catch( (error) => {
-				if (error=='Error [VOICE_JOIN_CHANNEL]: You do not have permission to join this voice channel.') {
-					guilds[guild.id].enabled = false;
-					console.log('['+guild.name+'] Channel Join Access Denied: Disabling bot!');
-					guild_voice_queue[guild.id] = [];
-				} else {
-					console.log('['+guild.name+'] joinChannel Unknown Error: ',error);
-				}
-				channel.leave();
-				setTimeout(() => {
-					reject('Error on Join!');
-				},200);
+			const connection = await joinVoiceChannel({
+				channelId: channel.id,
+				guildId: guild.id,
+				adapterCreator: guild.voiceAdapterCreator,
 			});
+			guild_voice[guild.id] = connection;
+			guild_voice_status[guild.id] = false;
 			console.log('['+guild.name+'] JOINED --> '+channel.id+' ('+channel.name+')');
 		}
-	});
+	}
 }
 
 async function audioQueueChannel(guild,channelId) {
@@ -189,12 +146,24 @@ async function audioQueueChannel(guild,channelId) {
 		pending = true;
 		let audioLength = 0;
 		await joinChannel(toPlay.guild,toPlay.channel);
-		await getAudioDurationInSeconds(toPlay.sound).then(duration => audioLength = duration);
+		try {
+			await getAudioDurationInSeconds(toPlay.sound).then(duration => audioLength = duration);
+		} catch {
+			console.log('Audio Cache was not found! '+toPlay.sound);
+			return false;
+		}
 		await new Promise((resolve,reject) => {
 					setTimeout(() => {
 						if (typeof guild_voice[toPlay.guild.id]==='object'&&guild_voice[toPlay.guild.id]!==null) {
-							guild_voice[toPlay.guild.id].play(toPlay.sound);
-							console.log('['+toPlay.guild.name+'] '+guild_voice[toPlay.guild.id].channel.id+' ('+guild_voice[toPlay.guild.id].channel.name+') Playing: '+toPlay.sound);
+							const audioPlayer = createAudioPlayer({
+								behaviors: {
+									noSubscriber: NoSubscriberBehavior.Pause,
+								},
+							});
+							const audioResource = createAudioResource(toPlay.sound);
+							guild_voice[toPlay.guild.id].subscribe(audioPlayer);
+							audioPlayer.play(audioResource);
+							console.log('['+toPlay.guild.name+'] '+guild_voice[toPlay.guild.id].joinConfig.channelId+' Playing: '+toPlay.sound);
 							setTimeout(() => {
 								resolve('Played!');
 							},((audioLength*1000)+500));
@@ -610,20 +579,20 @@ client.on('voiceStateUpdate', async (oldState, newState) => {
 			if (oldState.id==client.user.id) { //el viejo estado involucra a este bot
 				//No hacemos nada cuando somos nosotros
 			} else {
-				if (newState.channelID===null||
-					oldState.channelID!==null&&oldState.channelID!==newState.channelID
+				if (newState.channelId===null||
+					oldState.channelId!==null&&oldState.channelId!==newState.channelId
 				) {
 					// User leaves a voice channel // user changes voice chanel
-					await client.channels.fetch(oldState.channelID).then(async function (channel) {
+					await client.channels.fetch(oldState.channelId).then(async function (channel) {
 						await notifyChannel(oldState.guild,channel,member,'leave');
 					}).catch( async (error) => {console.error; });
 				}
 				if (
 					newState!==null
 					&&guilds[newState.guild.id].sayStatus
-					&&oldState.channelID===newState.channelID
+					&&oldState.channelId===newState.channelId
 				) {
-					await client.channels.fetch(newState.channelID).then(async function (channel) {
+					await client.channels.fetch(newState.channelId).then(async function (channel) {
 						if (newState.serverDeaf!==oldState.serverDeaf) {
 							if (newState.serverDeaf) {
 								await notifyChannel(newState.guild,channel,member,'serverdeaf');
@@ -667,18 +636,18 @@ client.on('voiceStateUpdate', async (oldState, newState) => {
 	if (newState!==null) { //posible usuario entrando a un canal
 		newState.guild.members.fetch(newState.id).then(async (member) => {
 			if (newState.id==client.user.id) { //el nuevo estado involucra a este Bot
-				if (newState.channelID===null) { //El nuevo estado significa que estamos desconectados
+				if (newState.channelId===null) { //El nuevo estado significa que estamos desconectados
 					guild_voice[newState.guild.id] = null; //Ponemos como nulo nuestro handler
 					guild_voice_status[newState.guild.id] = false; //status es falso
 				}
 			} else {
 				if (oldState!==null) { //existia un estado previo
-					if (oldState.channelID==newState.channelID) {
+					if (oldState.channelId==newState.channelId) {
 						//el usuario no cambio de canal, nos quedamos calladitos y no hacemos nada
 						return false;
 					}
 				}
-				await client.channels.fetch(newState.channelID).then(async function (channel) {
+				await client.channels.fetch(newState.channelId).then(async function (channel) {
 					await notifyChannel(newState.guild,channel,member,'join');
 				}).catch( async (error) => {console.error; });
 			}
@@ -711,8 +680,8 @@ client.ws.on('INTERACTION_CREATEX', async interaction => {
 		return false;
 	}
 	let voiceChannel = null;
-	if (member.voice.channelID!==null) {
-		await client.channels.fetch(member.voice.channelID).then(function (channel) {
+	if (member.voice.channelId!==null) {
+		await client.channels.fetch(member.voice.channelId).then(function (channel) {
 			voiceChannel = channel;
 		}).catch( error => console.error );
 	}
