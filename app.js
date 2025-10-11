@@ -4,7 +4,7 @@ const environment = process.env.NODE_ENV || 'development';
 const config = Object.assign(configjson['development'], configjson[environment]);
 const util = require('util');
 var crypto = require('crypto');
-const { Client, Collection, Intents } = require('discord.js');
+const { Client, Collection, IntentsBitField } = require('discord.js');
 const discordTTS = require('discord-tts');
 const GoogleCloudTextToSpeech = require('@google-cloud/text-to-speech');
 const ObservableSlim = require('observable-slim');
@@ -14,26 +14,31 @@ const { REST } = require('@discordjs/rest');
 const { Routes } = require('discord-api-types/v9');
 const { joinVoiceChannel, createAudioPlayer, NoSubscriberBehavior, getVoiceConnection, VoiceConnectionStatus, createAudioResource } = require('@discordjs/voice');
 
-const myIntents = new Intents();
-myIntents.add(Intents.FLAGS.GUILDS);
-myIntents.add(Intents.FLAGS.GUILD_MEMBERS);
-myIntents.add(Intents.FLAGS.GUILD_BANS);
-myIntents.add(Intents.FLAGS.GUILD_EMOJIS_AND_STICKERS);
-myIntents.add(Intents.FLAGS.GUILD_INTEGRATIONS);
-myIntents.add(Intents.FLAGS.GUILD_WEBHOOKS);
-myIntents.add(Intents.FLAGS.GUILD_INVITES);
-myIntents.add(Intents.FLAGS.GUILD_VOICE_STATES);
-myIntents.add(Intents.FLAGS.GUILD_PRESENCES);
-myIntents.add(Intents.FLAGS.GUILD_MESSAGES);
-myIntents.add(Intents.FLAGS.GUILD_MESSAGE_REACTIONS);
-myIntents.add(Intents.FLAGS.GUILD_MESSAGE_TYPING);
-myIntents.add(Intents.FLAGS.GUILD_VOICE_STATES);
-myIntents.add(Intents.FLAGS.DIRECT_MESSAGES);
-myIntents.add(Intents.FLAGS.DIRECT_MESSAGE_REACTIONS);
-myIntents.add(Intents.FLAGS.DIRECT_MESSAGE_TYPING);
+const myIntents = new IntentsBitField();
+
+myIntents.add(IntentsBitField.Flags.Guilds, 
+IntentsBitField.Flags.GuildMembers, 
+IntentsBitField.Flags.GuildModeration, 
+IntentsBitField.Flags.GuildBans, 
+IntentsBitField.Flags.GuildEmojisAndStickers, 
+IntentsBitField.Flags.GuildIntegrations, 
+IntentsBitField.Flags.GuildWebhooks, 
+IntentsBitField.Flags.GuildInvites, 
+IntentsBitField.Flags.GuildVoiceStates, 
+IntentsBitField.Flags.GuildPresences, 
+IntentsBitField.Flags.GuildMessages, 
+IntentsBitField.Flags.GuildMessageReactions, 
+IntentsBitField.Flags.GuildMessageTyping, 
+IntentsBitField.Flags.DirectMessages, 
+IntentsBitField.Flags.DirectMessageReactions, 
+IntentsBitField.Flags.DirectMessageTyping, 
+IntentsBitField.Flags.MessageContent, 
+IntentsBitField.Flags.GuildScheduledEvents, 
+IntentsBitField.Flags.AutoModerationConfiguration, 
+IntentsBitField.Flags.AutoModerationExecution);
+
 
 config.DiscordClient.intents = myIntents;
-console.log(config.DiscordClient);
 const client = new Client(config.DiscordClient);
 
 var guilds_data = {};
@@ -139,6 +144,12 @@ async function joinChannel(guild,channel) {
 		}
 	}
 }
+async function leaveChannel(guildId) {
+	const current_connection = getVoiceConnection(guildId);
+	if (typeof current_connection!=='undefined') {
+		current_connection.destroy();
+	}
+}
 
 async function audioQueueChannel(guild,channelId) {
 	let toPlay = guild_voice_queue[guild.id][channelId].shift();
@@ -168,7 +179,7 @@ async function audioQueueChannel(guild,channelId) {
 								resolve('Played!');
 							},((audioLength*1000)+500));
 						} else {
-							guild_voice_queue[guild.id][i].unshift(toPlay);
+							// guild_voice_queue[guild.id][i].unshift(toPlay);
 							reject('['+toPlay.guild.name+'] No object on voice!');
 						}
 					}, 150)
@@ -221,6 +232,12 @@ async function notifyChannel(guild,channel,member,type) {
 			var sonido = '';
 			var saludo = '';
 			switch (member.user.id) {
+				case '344649023577128963': //Fenix Weaver
+					sonido = './sounds/join_glados_ohitsyou.ogg'; break;
+				case '438648543025168385': //Vampyro
+					sonido = './sounds/join_vampyro.ogg'; break;
+				case '618522311535886346': //MikaelaLittleCrow
+					sonido = './sounds/join_mikaela.ogg'; break;
 				case '436724739868721153': //Zeus
 					sonido = './sounds/join_zeus.ogg'; break;
 				case '538464306539528192': //NikoSan
@@ -253,16 +270,36 @@ async function notifyChannel(guild,channel,member,type) {
 					break;
 				case '475796286067572766': //Crimson
 					sonido = './sounds/join_liontzuky3.ogg'; break;
+				case '901661641576448110': //Gabriel Bizmuth
+					sonido = './sounds/join_gabriel_901661641576448110.ogg'; break;
+				case '444983616020152345': //Happy 1000
+					sonido = './sounds/join_444983616020152345.ogg'; break;
+				case '692165447998636214': //JB Network
+					// sonido = './sounds/join_gabriel_901661641576448110.ogg'; break;
 				default:
-					sonido = './sounds/join_default.ogg';
+					switch (Math.floor(Math.random() * Math.floor(3))) {
+						case  0: sonido = './sounds/join_default.ogg'; break;
+						case  1: sonido = './sounds/join_default2.ogg'; break;
+						case  2: sonido = './sounds/join_default3.ogg'; break;
+					}
 					if (guilds[guild.id].sayNames) {
 						saludo = nickname;
 					}
 			}
 			playSound(guild,channel,sonido);
 			if (saludo!=='') {
-				var saludoFile = await GeneraVoz(saludo);
-				playSound(guild,channel,saludoFile);
+				if (member.user.id=='692165447998636214') { //JB Network
+					var saludoFile = await GeneraVoz('el pinche muñecazo acaba de conectarse');
+					playSound(guild,channel,saludoFile);
+				} else {
+					if (member.user.id=='994747188208992348') { //JB Network
+						var saludoFile = await GeneraVoz('el pinche muñecazo acaba de conectarse');
+						playSound(guild,channel,saludoFile);
+					} else {
+						var saludoFile = await GeneraVoz(saludo);
+						playSound(guild,channel,saludoFile);
+					}
+				}
 			}
 			break;
 		case 'leave':
@@ -276,7 +313,11 @@ async function notifyChannel(guild,channel,member,type) {
 				case '538464306539528192': //NikoSan
 				case '358776832536870913': //Taquero
 				default:
-					sonido = './sounds/leave_default.ogg';
+					switch (Math.floor(Math.random() * Math.floor(3))) {
+						case  0: sonido = './sounds/leave_default.ogg'; break;
+						case  1: sonido = './sounds/leave_default2.ogg'; break;
+						case  2: sonido = './sounds/leave_default3.ogg'; break;
+					}
 					if (guilds[guild.id].sayNames) {
 						saludo = nickname;
 					}
@@ -802,13 +843,8 @@ client.ws.on('INTERACTION_CREATEX', async interaction => {
 process.on('SIGINT',async () => {
 	console.log('Caught interrupt signal');
 	for (const [guildID, voz] of Object.entries(guild_voice)) {
-		console.log('GuildID '+guildID);
-		if (voz!==null) {
-			console.log('voz.status before',voz.status);
-			console.log('Requesting voice disconnect.');
-			await voz.disconnect();
-			console.log('voz.status after',voz.status);
-		}
+		console.log('Trying to destroy voice of GuildID '+guildID);
+		leaveChannel(guildID);
 	};
 	process.exit(0);
 });
