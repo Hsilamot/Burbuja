@@ -25,9 +25,9 @@
 		"discord-api-types": "^0.38.49",
 		"discord.js": "^14.23.2",
 		"ffmpeg": "0.0.4",
-		"google-auth-library": "^10.9.0",
 		"libsodium-wrappers": "^0.8.4",
 		"observable-slim": "^0.2.2",
+		"openai": "^6.45.0",
 		"opusscript": "^0.1.1",
 		"touch": "^3.1.0"
 	},

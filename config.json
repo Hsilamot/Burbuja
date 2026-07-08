@@ -2,22 +2,27 @@
 	"development": {
 		"DiscordClient": {
 			"autoReconnect": true,
-			"presence":{
-				"status":"Greeting People",
-				"afk":false
-			}
+			"presence": {
+				"status": "Greeting People",
+				"afk": false
+			},
+			"intents": [
+				65535
+			]
 		},
-		"Token": "",
-		"version": [0,7,79],
+		"version": [
+			0,
+			8,
+			399
+		],
 		"config_id": "development",
 		"GoogleTTS": {
-			"keyFile": "gcp_keys/LLAVE DE GCP.json",
-			"projectId": "NOMBRE DEL PROYECTO",
+			"projectId": "tomalish",
 			"templateObject": {
 				"audioConfig": {
 					"audioEncoding": "OGG_OPUS",
 					"pitch": 0,
-					"speakingRate": 1.00
+					"speakingRate": 1
 				},
 				"input": {
 					"text": "Texto de Ejemplo"

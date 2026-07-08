@@ -5,12 +5,12 @@ const path = require('path');
 const configjson = require('./config.json');
 const environment = process.env.NODE_ENV || 'development';
 const config = { ...configjson.development, ...configjson[environment] };
-config.Token = process.env.DISCORD_TOKEN || config.Token;
+config.Token = process.env.DISCORD_TOKEN;
 const util = require('util');
 var crypto = require('crypto');
 const { Client, Collection, Events, IntentsBitField } = require('discord.js');
+const OpenAI = require('openai');
 const GoogleCloudTextToSpeech = require('@google-cloud/text-to-speech');
-const { GoogleAuth } = require('google-auth-library');
 const ObservableSlim = require('observable-slim');
 var touch = require("touch");
 const { REST } = require('@discordjs/rest');
@@ -59,19 +59,23 @@ var guilds = ObservableSlim.create(guilds_data, true, function(changes) {
 	})
 });
 
-const googleTTSConfig = { ...config.GoogleTTS };
-if (googleTTSConfig.keyFile) {
-	const credentialsPath = path.resolve(googleTTSConfig.keyFile);
-	const credentials = JSON.parse(fs.readFileSync(credentialsPath, 'utf8'));
-	googleTTSConfig.auth = new GoogleAuth({
-		credentials,
-		projectId: googleTTSConfig.projectId,
-	});
-	delete googleTTSConfig.keyFile;
-	delete googleTTSConfig.projectId;
-}
+if (!config.Token) throw new Error('Falta la variable de entorno DISCORD_TOKEN');
+
+const googleTTSConfig = {
+	projectId: process.env.GOOGLE_CLOUD_PROJECT || config.GoogleTTS?.projectId,
+};
 delete googleTTSConfig.templateObject;
 const googleTTS = new GoogleCloudTextToSpeech.TextToSpeechClient(googleTTSConfig);
+
+const openAITTSConfig = {
+	model: 'gpt-4o-mini-tts',
+	voice: 'coral',
+	instructions: 'Voz femenina joven, dulce, brillante, inocente y muy entusiasta. Habla en español de México como una heroína infantil de caricatura saludando por teléfono, con energía juguetona, dicción clara y una sonrisa audible. No imites exactamente a una persona o personaje existente.',
+	...config.OpenAI,
+};
+const openAIApiKey = process.env.OPENAI_API_KEY;
+const openAI = openAIApiKey ? new OpenAI({ apiKey: openAIApiKey }) : null;
+let openAIUnavailableWasLogged = false;
 
 const rest = new REST({ version: '9' }).setToken(config.Token);
 client.commands = new Collection();
@@ -83,7 +87,50 @@ for (const file of comandosFiles) {
 	client.commands.set(comando.data.name, comando);
 }
 
-async function GeneraVoz(textoaconvertir) {
+function getVoiceCachePath(provider, cacheInput) {
+	const hash = crypto.createHash('sha512').update(cacheInput, 'utf8').digest('hex');
+	return path.join('voice_cache', provider+'_'+hash+'.ogg');
+}
+
+async function GeneraVozOpenAI(textoaconvertir) {
+	if (!openAI) {
+		if (!openAIUnavailableWasLogged) {
+			console.warn('OPENAI_API_KEY no esta configurada; se usara Google TTS.');
+			openAIUnavailableWasLogged = true;
+		}
+		return null;
+	}
+
+	const cacheInput = JSON.stringify({
+		model: openAITTSConfig.model,
+		voice: openAITTSConfig.voice,
+		instructions: openAITTSConfig.instructions,
+		text: textoaconvertir,
+	});
+	const cacheFile = getVoiceCachePath('openai', cacheInput);
+	if (fs.existsSync(cacheFile)) {
+		touch(cacheFile);
+		return cacheFile;
+	}
+
+	try {
+		const response = await openAI.audio.speech.create({
+			model: openAITTSConfig.model,
+			voice: openAITTSConfig.voice,
+			instructions: openAITTSConfig.instructions,
+			input: textoaconvertir,
+			response_format: 'opus',
+		});
+		await fs.promises.writeFile(cacheFile, Buffer.from(await response.arrayBuffer()));
+		console.log('Generado audio OpenAI TTS --> '+cacheFile);
+		return cacheFile;
+	} catch (error) {
+		console.error('OpenAI TTS fallo; se intentara Google TTS:', error.message || error);
+		return null;
+	}
+}
+
+async function GeneraVozGoogle(textoaconvertir) {
 	const request = Object.assign({}, config.GoogleTTS.templateObject,
 						{
 							"input": {
@@ -109,6 +156,10 @@ async function GeneraVoz(textoaconvertir) {
 		console.error('No fue posible generar la voz:', err);
 		return null;
 	}
+}
+
+async function GeneraVoz(textoaconvertir) {
+	return await GeneraVozOpenAI(textoaconvertir) || await GeneraVozGoogle(textoaconvertir);
 }
 
 function quickBotReply(message,text,...params) {
