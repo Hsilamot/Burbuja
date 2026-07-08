@@ -1,21 +1,23 @@
 'use strict';
 
 const fs = require('fs');
+const path = require('path');
 const configjson = require('./config.json');
 const environment = process.env.NODE_ENV || 'development';
 const config = { ...configjson.development, ...configjson[environment] };
 config.Token = process.env.DISCORD_TOKEN || config.Token;
 const util = require('util');
 var crypto = require('crypto');
-const { Client, Collection, IntentsBitField } = require('discord.js');
+const { Client, Collection, Events, IntentsBitField } = require('discord.js');
 const GoogleCloudTextToSpeech = require('@google-cloud/text-to-speech');
+const { GoogleAuth } = require('google-auth-library');
 const ObservableSlim = require('observable-slim');
 var touch = require("touch");
 const { REST } = require('@discordjs/rest');
 const { Routes } = require('discord-api-types/v9');
 const {
 	joinVoiceChannel, createAudioPlayer, NoSubscriberBehavior, getVoiceConnection,
-	VoiceConnectionStatus, AudioPlayerStatus, entersState, createAudioResource,
+	getVoiceConnections, VoiceConnectionStatus, AudioPlayerStatus, entersState, createAudioResource,
 } = require('@discordjs/voice');
 
 const myIntents = new IntentsBitField();
@@ -57,7 +59,19 @@ var guilds = ObservableSlim.create(guilds_data, true, function(changes) {
 	})
 });
 
-const googleTTS = new GoogleCloudTextToSpeech.TextToSpeechClient(config.GoogleTTS);
+const googleTTSConfig = { ...config.GoogleTTS };
+if (googleTTSConfig.keyFile) {
+	const credentialsPath = path.resolve(googleTTSConfig.keyFile);
+	const credentials = JSON.parse(fs.readFileSync(credentialsPath, 'utf8'));
+	googleTTSConfig.auth = new GoogleAuth({
+		credentials,
+		projectId: googleTTSConfig.projectId,
+	});
+	delete googleTTSConfig.keyFile;
+	delete googleTTSConfig.projectId;
+}
+delete googleTTSConfig.templateObject;
+const googleTTS = new GoogleCloudTextToSpeech.TextToSpeechClient(googleTTSConfig);
 
 const rest = new REST({ version: '9' }).setToken(config.Token);
 client.commands = new Collection();
@@ -114,6 +128,7 @@ function quickBotReply(message,text,...params) {
 var guild_voice = {};
 let guild_voice_queue = {};
 let guild_voice_queue_executing = {};
+const intentionalDisconnects = new WeakSet();
 
 function configureVoiceConnection(connection, guild) {
 	connection.on('error', (error) => {
@@ -122,6 +137,7 @@ function configureVoiceConnection(connection, guild) {
 	connection.on('stateChange', async (oldState, newState) => {
 		console.log('['+guild.name+'] Voice: '+oldState.status+' -> '+newState.status);
 		if (newState.status !== VoiceConnectionStatus.Disconnected) return;
+		if (intentionalDisconnects.has(connection)) return;
 		try {
 			await Promise.race([
 				entersState(connection, VoiceConnectionStatus.Signalling, 5_000),
@@ -161,11 +177,36 @@ async function joinChannel(guild,channel) {
 		} else guild_voice[guild.id] = current_connection;
 	}
 }
-async function leaveChannel(guildId) {
-	const current_connection = getVoiceConnection(guildId);
-	if (typeof current_connection!=='undefined') {
-		current_connection.destroy();
-	}
+function waitForVoiceDisconnect(guildId, timeoutMs = 4_000) {
+	return new Promise((resolve) => {
+		let timer;
+		const cleanup = (confirmed) => {
+			clearTimeout(timer);
+			client.off(Events.VoiceStateUpdate, onVoiceStateUpdate);
+			resolve(confirmed);
+		};
+		const onVoiceStateUpdate = (oldState, newState) => {
+			if (newState.guild.id === guildId && newState.id === client.user.id && newState.channelId === null) {
+				cleanup(true);
+			}
+		};
+		client.on(Events.VoiceStateUpdate, onVoiceStateUpdate);
+		timer = setTimeout(() => cleanup(false), timeoutMs);
+	});
+}
+
+async function leaveChannel(guildId, connection = getVoiceConnection(guildId)) {
+	if (!connection || connection.state.status === VoiceConnectionStatus.Destroyed) return false;
+
+	intentionalDisconnects.add(connection);
+	const confirmation = waitForVoiceDisconnect(guildId);
+	connection.disconnect();
+	const confirmed = await confirmation;
+	if (!confirmed) console.warn('Discord no confirmo a tiempo la salida de voz de '+guildId);
+
+	if (connection.state.status !== VoiceConnectionStatus.Destroyed) connection.destroy();
+	if (guild_voice[guildId] === connection) guild_voice[guildId] = null;
+	return confirmed;
 }
 
 async function audioQueueChannel(guild,channelId) {
@@ -600,7 +641,7 @@ client.on('guildDelete', guild => {
 	console.log('He abandonado ' + guild.name);
 })
 client.on('error', (error) => console.error('Error del cliente de Discord:', error));
-client.on('ready', async () => {
+client.on(Events.ClientReady, async () => {
 	console.log(`Logged in as ${client.user.tag}!`);
 	console.log('Retrieving guilds...');
 	client.guilds.cache.forEach((guild) => {
@@ -849,14 +890,35 @@ client.ws.on('INTERACTION_CREATEX', async interaction => {
 		}
 	});
 });
-process.on('SIGINT',async () => {
-	console.log('Caught interrupt signal');
-	for (const [guildID, voz] of Object.entries(guild_voice)) {
-		console.log('Trying to destroy voice of GuildID '+guildID);
-		leaveChannel(guildID);
-	};
-	process.exit(0);
-});
+let shutdownPromise = null;
+async function shutdown(signal) {
+	if (shutdownPromise) return shutdownPromise;
+	shutdownPromise = (async () => {
+		console.log('Recibida señal '+signal+'. Cerrando conexiones...');
+		const activeConnections = [...getVoiceConnections().entries()]
+			.filter(([, connection]) => connection.state.status !== VoiceConnectionStatus.Destroyed);
+
+		await Promise.all(activeConnections.map(async ([guildId, connection]) => {
+			console.log('Desconectando voz de GuildID '+guildId+'...');
+			try {
+				await leaveChannel(guildId, connection);
+			} catch (error) {
+				console.error('Error desconectando voz de '+guildId+':', error);
+				if (connection.state.status !== VoiceConnectionStatus.Destroyed) connection.destroy();
+			}
+		}));
+
+		await googleTTS.close().catch((error) => console.error('Error cerrando Google TTS:', error));
+		client.destroy();
+		console.log('Bot desconectado correctamente.');
+		process.exitCode = 0;
+		setTimeout(() => process.exit(0), 1_000);
+	})();
+	return shutdownPromise;
+}
+
+process.once('SIGINT', () => void shutdown('SIGINT'));
+process.once('SIGTERM', () => void shutdown('SIGTERM'));
 
 console.log('Start...'); 
 
