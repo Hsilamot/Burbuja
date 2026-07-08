@@ -10,11 +10,7 @@
 				65535
 			]
 		},
-		"version": [
-			0,
-			8,
-			399
-		],
+		"version": [1,1,568],
 		"config_id": "development",
 		"GoogleTTS": {
 			"projectId": "tomalish",
@@ -32,6 +28,9 @@
 					"name": "es-ES-Standard-A"
 				}
 			}
+		},
+		"OpenAI": {
+			"instructions": "Voz femenina infantil, dulce, brillante, inocente y muy entusiasta. Habla en español de México como una heroína infantil de caricatura saludando por teléfono, inspirada en Burbuja de Las Chicas Superpoderosas, con energía juguetona, dicción clara y una sonrisa audible. No imites exactamente a una persona o personaje existente."
 		}
 	},
 	"production": {

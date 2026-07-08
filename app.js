@@ -70,7 +70,6 @@ const googleTTS = new GoogleCloudTextToSpeech.TextToSpeechClient(googleTTSConfig
 const openAITTSConfig = {
 	model: 'gpt-4o-mini-tts',
 	voice: 'coral',
-	instructions: 'Voz femenina joven, dulce, brillante, inocente y muy entusiasta. Habla en español de México como una heroína infantil de caricatura saludando por teléfono, con energía juguetona, dicción clara y una sonrisa audible. No imites exactamente a una persona o personaje existente.',
 	...config.OpenAI,
 };
 const openAIApiKey = process.env.OPENAI_API_KEY;
