@@ -10,28 +10,24 @@
 		"url": "https://github.com/Hsilamot/Burbuja.git"
 	},
 	"engines": {
-		"node": ">=14.0.0"
+		"node": ">=22.12.0"
 	},
 	"scripts": {
 		"start": "node app.js"
 	},
 	"dependencies": {
 		"@discordjs/builders": "^1.6.4",
-		"@discordjs/opus": "github:discordjs/opus",
-		"@discordjs/rest": "2.0.0",
+		"@discordjs/rest": "^2.6.1",
 		"@discordjs/voice": "^0.19.0",
 		"@google-cloud/text-to-speech": "^6.3.0",
 		"@snazzah/davey": "^0.1.7",
-		"axios": "^1.12.2",
 		"davey": "^0.6.3",
 		"discord-api-types": "^0.37.51",
-		"discord-tts": "^1.0.3",
 		"discord.js": "^14.23.2",
 		"ffmpeg": "0.0.4",
-		"get-audio-duration": "^4.0.1",
-		"google-tts-api": "^0.0.6",
 		"libsodium-wrappers": "^0.7.11",
 		"observable-slim": "^0.1.6",
+		"opusscript": "^0.0.8",
 		"touch": "^3.1.0"
 	},
 	"devDependencies": {

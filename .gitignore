@@ -27,6 +27,7 @@ yarn-error.log*
 guilds/*
 gcp_keys/*
 voice_cache/*
+voice_cache2/*
 ffmpeg.exe
 ffplay.exe
 ffprobe.exe

@@ -1,18 +1,22 @@
+'use strict';
+
 const fs = require('fs');
 const configjson = require('./config.json');
 const environment = process.env.NODE_ENV || 'development';
-const config = Object.assign(configjson['development'], configjson[environment]);
+const config = { ...configjson.development, ...configjson[environment] };
+config.Token = process.env.DISCORD_TOKEN || config.Token;
 const util = require('util');
 var crypto = require('crypto');
 const { Client, Collection, IntentsBitField } = require('discord.js');
-const discordTTS = require('discord-tts');
 const GoogleCloudTextToSpeech = require('@google-cloud/text-to-speech');
 const ObservableSlim = require('observable-slim');
-const { getAudioDurationInSeconds } = require('get-audio-duration');
 var touch = require("touch");
 const { REST } = require('@discordjs/rest');
 const { Routes } = require('discord-api-types/v9');
-const { joinVoiceChannel, createAudioPlayer, NoSubscriberBehavior, getVoiceConnection, VoiceConnectionStatus, createAudioResource } = require('@discordjs/voice');
+const {
+	joinVoiceChannel, createAudioPlayer, NoSubscriberBehavior, getVoiceConnection,
+	VoiceConnectionStatus, AudioPlayerStatus, entersState, createAudioResource,
+} = require('@discordjs/voice');
 
 const myIntents = new IntentsBitField();
 
@@ -45,13 +49,9 @@ var guilds_data = {};
 var guilds = ObservableSlim.create(guilds_data, true, function(changes) {
 	changes.forEach((value,key) => {
 		if (value.type=='add'||value.type=='update') {
-			rompe = value.jsonPointer.split('/');
+			const rompe = value.jsonPointer.split('/');
 			if (rompe.length>2) {
-				fs.writeFileSync('./guilds/'+rompe[1]+'.json', JSON.stringify(guilds[rompe[1]]), (err) => {
-					if (err) {
-						console.log('Error',err);
-					}
-				});
+				fs.writeFileSync('./guilds/'+rompe[1]+'.json', JSON.stringify(guilds[rompe[1]]));
 			}
 		}
 	})
@@ -70,16 +70,16 @@ for (const file of comandosFiles) {
 }
 
 async function GeneraVoz(textoaconvertir) {
-	const request = Object.assign(config.GoogleTTS.templateObject,
+	const request = Object.assign({}, config.GoogleTTS.templateObject,
 						{
 							"input": {
 								"text": textoaconvertir
 							}
 						}
 					);
-	var hashSha512 = crypto.createHash('sha512');
-	hashraw = hashSha512.update(textoaconvertir, 'utf-8');
-	sha512hash = hashraw.digest('hex');
+	const hashSha512 = crypto.createHash('sha512');
+	const hashraw = hashSha512.update(textoaconvertir, 'utf-8');
+	const sha512hash = hashraw.digest('hex');
 	try {
 		if (fs.existsSync('voice_cache/'+sha512hash+'.ogg')) {
 			touch('voice_cache/'+sha512hash+'.ogg');
@@ -92,7 +92,8 @@ async function GeneraVoz(textoaconvertir) {
 			return 'voice_cache/'+sha512hash+'.ogg';
 		}
 	} catch(err) {
-		console.log(err);
+		console.error('No fue posible generar la voz:', err);
+		return null;
 	}
 }
 
@@ -110,38 +111,54 @@ function quickBotReply(message,text,...params) {
 	message.delete().catch(console.error);
 }
 
-let voz = null;
-let current = null;
 var guild_voice = {};
-var guild_voice_status = {};
 let guild_voice_queue = {};
 let guild_voice_queue_executing = {};
+
+function configureVoiceConnection(connection, guild) {
+	connection.on('error', (error) => {
+		console.error('['+guild.name+'] Error en la conexion de voz:', error);
+	});
+	connection.on('stateChange', async (oldState, newState) => {
+		console.log('['+guild.name+'] Voice: '+oldState.status+' -> '+newState.status);
+		if (newState.status !== VoiceConnectionStatus.Disconnected) return;
+		try {
+			await Promise.race([
+				entersState(connection, VoiceConnectionStatus.Signalling, 5_000),
+				entersState(connection, VoiceConnectionStatus.Connecting, 5_000),
+			]);
+		} catch {
+			connection.destroy();
+			if (guild_voice[guild.id] === connection) guild_voice[guild.id] = null;
+		}
+	});
+	return connection;
+}
 
 async function joinChannel(guild,channel) {
 	if (!guilds[guild.id].enabled) { return false; }
 	const current_connection = getVoiceConnection(guild.id);
 	if (typeof current_connection==='undefined') {
 		console.log('['+guild.name+'] JOIN --> '+channel.id+' ('+channel.name+')');
-		const connection = await joinVoiceChannel({
+		const connection = configureVoiceConnection(joinVoiceChannel({
 			channelId: channel.id,
 			guildId: guild.id,
 			adapterCreator: guild.voiceAdapterCreator,
-		});
+		}), guild);
 		guild_voice[guild.id] = connection;
-		guild_voice_status[guild.id] = false;
 		console.log('['+guild.name+'] JOINED --> '+channel.id+' ('+channel.name+')');
 	} else {
 		if (current_connection.joinConfig.channelId!==channel.id) {
 			console.log('['+guild.name+'] JOIN --> '+channel.id+' ('+channel.name+')');
-			const connection = await joinVoiceChannel({
+			current_connection.destroy();
+			const connection = configureVoiceConnection(joinVoiceChannel({
 				channelId: channel.id,
 				guildId: guild.id,
 				adapterCreator: guild.voiceAdapterCreator,
-			});
+			}), guild);
 			guild_voice[guild.id] = connection;
-			guild_voice_status[guild.id] = false;
 			console.log('['+guild.name+'] JOINED --> '+channel.id+' ('+channel.name+')');
-		}
+		} else guild_voice[guild.id] = current_connection;
 	}
 }
 async function leaveChannel(guildId) {
@@ -152,38 +169,31 @@ async function leaveChannel(guildId) {
 }
 
 async function audioQueueChannel(guild,channelId) {
-	let toPlay = guild_voice_queue[guild.id][channelId].shift();
+	const toPlay = guild_voice_queue[guild.id][channelId].shift();
 	if (toPlay!==undefined) {
-		pending = true;
-		let audioLength = 0;
-		await joinChannel(toPlay.guild,toPlay.channel);
 		try {
-			await getAudioDurationInSeconds(toPlay.sound).then(duration => audioLength = duration);
-		} catch {
-			console.log('Audio Cache was not found! '+toPlay.sound);
-			return false;
+			await joinChannel(toPlay.guild,toPlay.channel);
+			const connection = guild_voice[toPlay.guild.id];
+			if (!connection) throw new Error('No existe una conexion de voz activa');
+			await entersState(connection, VoiceConnectionStatus.Ready, 20_000);
+			await new Promise((resolve, reject) => {
+				const audioPlayer = createAudioPlayer({ behaviors: { noSubscriber: NoSubscriberBehavior.Pause } });
+				let finished = false;
+				const finish = (error) => {
+					if (finished) return;
+					finished = true;
+					audioPlayer.stop(true);
+					error ? reject(error) : resolve();
+				};
+				audioPlayer.once(AudioPlayerStatus.Idle, () => finish());
+				audioPlayer.once('error', finish);
+				connection.subscribe(audioPlayer);
+				audioPlayer.play(createAudioResource(toPlay.sound));
+				console.log('['+toPlay.guild.name+'] '+connection.joinConfig.channelId+' Playing: '+toPlay.sound);
+			});
+		} catch (error) {
+			console.error('['+toPlay.guild.name+'] No se pudo reproducir '+toPlay.sound+':', error);
 		}
-		await new Promise((resolve,reject) => {
-					setTimeout(() => {
-						if (typeof guild_voice[toPlay.guild.id]==='object'&&guild_voice[toPlay.guild.id]!==null) {
-							const audioPlayer = createAudioPlayer({
-								behaviors: {
-									noSubscriber: NoSubscriberBehavior.Pause,
-								},
-							});
-							const audioResource = createAudioResource(toPlay.sound);
-							guild_voice[toPlay.guild.id].subscribe(audioPlayer);
-							audioPlayer.play(audioResource);
-							console.log('['+toPlay.guild.name+'] '+guild_voice[toPlay.guild.id].joinConfig.channelId+' Playing: '+toPlay.sound);
-							setTimeout(() => {
-								resolve('Played!');
-							},((audioLength*1000)+500));
-						} else {
-							// guild_voice_queue[guild.id][i].unshift(toPlay);
-							reject('['+toPlay.guild.name+'] No object on voice!');
-						}
-					}, 150)
-				}).catch( async (error) => {console.log(error); });
 	}
 }
 
@@ -191,22 +201,24 @@ async function audioQueue(guild) {
 	if (!guilds[guild.id].enabled) { return false; }
 	if (guild_voice_queue_executing[guild.id]===false) {
 		guild_voice_queue_executing[guild.id] = true;
-		var pending = false;
-		for (i in guild_voice_queue[guild.id]) {
+		for (const i in guild_voice_queue[guild.id]) {
 			while (typeof guild_voice_queue[guild.id][i]!=='undefined'&&guild_voice_queue[guild.id][i].length>0) {
-				pending = true;
 				await audioQueueChannel(guild,i);
 			}
 		}
 		guild_voice_queue_executing[guild.id] = false;
-		if (pending) {
-			audioQueue(guild);
+		if (Object.values(guild_voice_queue[guild.id]).some(queue => queue.length > 0)) {
+			void audioQueue(guild);
 		}
 	}
 }
 
 async function playSound(guild,channel,sound) {
 	if (!guilds[guild.id].enabled) { return false; }
+	if (!channel || !sound) {
+		console.error('No se puede reproducir audio sin canal y sonido validos');
+		return false;
+	}
 	var pendingPlay = {};
 	pendingPlay.guild = guild;
 	pendingPlay.channel = channel;
@@ -215,7 +227,7 @@ async function playSound(guild,channel,sound) {
 		guild_voice_queue[guild.id][channel.id] = [];
 	}
 	guild_voice_queue[guild.id][channel.id].push(pendingPlay);
-	audioQueue(guild);
+	void audioQueue(guild);
 }
 
 async function notifyChannel(guild,channel,member,type) {
@@ -398,7 +410,6 @@ async function loadGuild(guild) {
 	guild_voice[guild.id] = null;
 	guild_voice_queue[guild.id] = [];
 	guild_voice_queue_executing[guild.id] = false;
-	guild_voice_status[guild.id] = false;
 	/*
 	client.api.applications(client.user.id).guilds(guild.id).commands.post({
 		data: {
@@ -588,7 +599,7 @@ client.on('guildCreate', guild => {
 client.on('guildDelete', guild => {
 	console.log('He abandonado ' + guild.name);
 })
-client.on('error', () => {console.error});
+client.on('error', (error) => console.error('Error del cliente de Discord:', error));
 client.on('ready', async () => {
 	console.log(`Logged in as ${client.user.tag}!`);
 	console.log('Retrieving guilds...');
@@ -626,7 +637,7 @@ client.on('voiceStateUpdate', async (oldState, newState) => {
 					// User leaves a voice channel // user changes voice chanel
 					await client.channels.fetch(oldState.channelId).then(async function (channel) {
 						await notifyChannel(oldState.guild,channel,member,'leave');
-					}).catch( async (error) => {console.error; });
+					}).catch(console.error);
 				}
 				if (
 					newState!==null
@@ -669,17 +680,16 @@ client.on('voiceStateUpdate', async (oldState, newState) => {
 								await notifyChannel(newState.guild,channel,member,'endstream');
 							}
 						}
-					}).catch( async (error) => {console.error; });
+					}).catch(console.error);
 				}
 			}
-		}).catch( async (error) => {console.error; });
+		}).catch(console.error);
 	}
 	if (newState!==null) { //posible usuario entrando a un canal
 		newState.guild.members.fetch(newState.id).then(async (member) => {
 			if (newState.id==client.user.id) { //el nuevo estado involucra a este Bot
 				if (newState.channelId===null) { //El nuevo estado significa que estamos desconectados
 					guild_voice[newState.guild.id] = null; //Ponemos como nulo nuestro handler
-					guild_voice_status[newState.guild.id] = false; //status es falso
 				}
 			} else {
 				if (oldState!==null) { //existia un estado previo
@@ -688,25 +698,25 @@ client.on('voiceStateUpdate', async (oldState, newState) => {
 						return false;
 					}
 				}
+				if (newState.channelId === null) return;
 				await client.channels.fetch(newState.channelId).then(async function (channel) {
 					await notifyChannel(newState.guild,channel,member,'join');
-				}).catch( async (error) => {console.error; });
+				}).catch(console.error);
 			}
-		}).catch( async (error) => {console.error; });
+		}).catch(console.error);
 	}
 });
-client.on('stateChange', (oldState, newState) => {
-	console.log(`Connection transitioned from ${oldState.status} to ${newState.status}`);
-});
 client.on('interactionCreate', async interaction => {
-	if (!interaction.isCommand()) return;
+	if (!interaction.isChatInputCommand()) return;
 	const comando = client.commands.get(interaction.commandName);
 	if (!comando) return;
 	try {
 		await comando.execute(interaction);
 	} catch (error) {
 		console.error(error);
-		await interaction.reply({ content: 'Ocurrio un error al ejecutar el comando', ephemeral: true });
+		const response = { content: 'Ocurrio un error al ejecutar el comando', ephemeral: true };
+		if (interaction.replied || interaction.deferred) await interaction.followUp(response);
+		else await interaction.reply(response);
 	}
 });
 
@@ -745,7 +755,6 @@ client.ws.on('INTERACTION_CREATEX', async interaction => {
 							answer = '😢 ok dejaré de saludar a todos';
 							if (guild_voice[guild.id]!==null&&guild_voice[guild.id]!==undefined) {
 								guild_voice[guild.id].disconnect();
-								guild_voice_status[guild.id] = false;
 							}
 							guilds[guild.id].enabled = false;
 							break;
