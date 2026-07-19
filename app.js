@@ -2,11 +2,18 @@
 
 const fs = require('fs');
 const path = require('path');
+const readline = require('readline');
+const { execFile } = require('child_process');
+const consoleMethodNames = ['log', 'info', 'warn', 'error', 'debug'];
+const originalConsoleMethods = Object.fromEntries(
+	consoleMethodNames.map((method) => [method, console[method].bind(console)]),
+);
 const configjson = require('./config.json');
 const environment = process.env.NODE_ENV || 'development';
 const config = { ...configjson.development, ...configjson[environment] };
 config.Token = process.env.DISCORD_TOKEN;
 const util = require('util');
+const execFileAsync = util.promisify(execFile);
 var crypto = require('crypto');
 const { Client, Collection, Events, IntentsBitField } = require('discord.js');
 const OpenAI = require('openai');
@@ -89,6 +96,54 @@ for (const file of comandosFiles) {
 function getVoiceCachePath(provider, cacheInput) {
 	const hash = crypto.createHash('sha512').update(cacheInput, 'utf8').digest('hex');
 	return path.join('voice_cache', provider+'_'+hash+'.ogg');
+}
+
+async function CombinaAudios(introFile, voiceFile) {
+	if (!introFile || !voiceFile) return null;
+	const ffmpegPath = fs.existsSync(path.resolve('ffmpeg.exe')) ? path.resolve('ffmpeg.exe') : 'ffmpeg';
+	let tempFile = null;
+	try {
+		const [introStat, voiceStat] = await Promise.all([
+			fs.promises.stat(introFile),
+			fs.promises.stat(voiceFile),
+		]);
+		const cacheInput = JSON.stringify({
+			version: 1,
+			intro: path.resolve(introFile),
+			introSize: introStat.size,
+			introModified: introStat.mtimeMs,
+			voice: path.resolve(voiceFile),
+			voiceSize: voiceStat.size,
+			voiceModified: voiceStat.mtimeMs,
+		});
+		const outputFile = getVoiceCachePath('combined', cacheInput);
+		if (fs.existsSync(outputFile)) {
+			touch(outputFile);
+			return outputFile;
+		}
+
+		tempFile = outputFile+'.'+process.pid+'.'+Date.now()+'.tmp.ogg';
+		const filter = '[0:a]aformat=sample_rates=48000:channel_layouts=stereo,silenceremove=stop_periods=-1:stop_duration=0.06:stop_threshold=-45dB[a0];[1:a]aformat=sample_rates=48000:channel_layouts=stereo,silenceremove=start_periods=1:start_duration=0.02:start_threshold=-45dB[a1];[a0][a1]concat=n=2:v=0:a=1[out]';
+		await execFileAsync(ffmpegPath, [
+			'-hide_banner', '-loglevel', 'error', '-y',
+			'-i', introFile, '-i', voiceFile,
+			'-filter_complex', filter,
+			'-map', '[out]', '-c:a', 'libopus', '-b:a', '96k',
+			tempFile,
+		]);
+		try {
+			await fs.promises.rename(tempFile, outputFile);
+		} catch (error) {
+			if (!fs.existsSync(outputFile)) throw error;
+			await fs.promises.rm(tempFile, { force: true });
+		}
+		console.log('Generado saludo combinado --> '+outputFile);
+		return outputFile;
+	} catch (error) {
+		if (tempFile) await fs.promises.rm(tempFile, { force: true }).catch(() => {});
+		console.error('No se pudieron combinar los audios; se reproduciran por separado:', error.message || error);
+		return null;
+	}
 }
 
 async function GeneraVozOpenAI(textoaconvertir) {
@@ -178,7 +233,15 @@ function quickBotReply(message,text,...params) {
 var guild_voice = {};
 let guild_voice_queue = {};
 let guild_voice_queue_executing = {};
+const activeAudioPlayers = new Map();
 const intentionalDisconnects = new WeakSet();
+
+function stopActiveAudio(guildId) {
+	const audioPlayer = activeAudioPlayers.get(guildId);
+	if (!audioPlayer) return;
+	activeAudioPlayers.delete(guildId);
+	audioPlayer.stop(true);
+}
 
 function configureVoiceConnection(connection, guild) {
 	connection.on('error', (error) => {
@@ -194,11 +257,33 @@ function configureVoiceConnection(connection, guild) {
 				entersState(connection, VoiceConnectionStatus.Connecting, 5_000),
 			]);
 		} catch {
-			connection.destroy();
+			stopActiveAudio(guild.id);
+			if (connection.state.status !== VoiceConnectionStatus.Destroyed) connection.destroy();
 			if (guild_voice[guild.id] === connection) guild_voice[guild.id] = null;
 		}
 	});
 	return connection;
+}
+
+function waitForBotVoiceChannel(guild, channelId, timeoutMs = 10_000) {
+	if (guild.members.me?.voice.channelId === channelId) return Promise.resolve(true);
+
+	return new Promise((resolve) => {
+		let timer;
+		const cleanup = (confirmed) => {
+			clearTimeout(timer);
+			client.off(Events.VoiceStateUpdate, onVoiceStateUpdate);
+			resolve(confirmed);
+		};
+		const onVoiceStateUpdate = (oldState, newState) => {
+			if (newState.guild.id === guild.id && newState.id === client.user.id &&
+				newState.channelId === channelId) {
+				cleanup(true);
+			}
+		};
+		client.on(Events.VoiceStateUpdate, onVoiceStateUpdate);
+		timer = setTimeout(() => cleanup(false), timeoutMs);
+	});
 }
 
 async function joinChannel(guild,channel) {
@@ -212,20 +297,33 @@ async function joinChannel(guild,channel) {
 			adapterCreator: guild.voiceAdapterCreator,
 		}), guild);
 		guild_voice[guild.id] = connection;
+		if (!await waitForBotVoiceChannel(guild, channel.id)) {
+			const error = new Error('Discord no confirmo la entrada al canal '+channel.id);
+			error.code = 'VOICE_CHANNEL_TIMEOUT';
+			throw error;
+		}
 		console.log('['+guild.name+'] JOINED --> '+channel.id+' ('+channel.name+')');
-	} else {
-		if (current_connection.joinConfig.channelId!==channel.id) {
-			console.log('['+guild.name+'] JOIN --> '+channel.id+' ('+channel.name+')');
-			current_connection.destroy();
-			const connection = configureVoiceConnection(joinVoiceChannel({
-				channelId: channel.id,
-				guildId: guild.id,
-				adapterCreator: guild.voiceAdapterCreator,
-			}), guild);
-			guild_voice[guild.id] = connection;
-			console.log('['+guild.name+'] JOINED --> '+channel.id+' ('+channel.name+')');
-		} else guild_voice[guild.id] = current_connection;
+		return connection;
 	}
+
+	const actualChannelId = guild.members.me?.voice.channelId;
+	if (actualChannelId!==channel.id) {
+		console.log('['+guild.name+'] MOVE --> '+channel.id+' ('+channel.name+')');
+		if (!current_connection.rejoin({ channelId: channel.id })) {
+			console.warn('['+guild.name+'] No se pudo reutilizar la conexion; se creara una nueva');
+			await leaveChannel(guild.id, current_connection);
+			return joinChannel(guild, channel);
+		}
+		if (!await waitForBotVoiceChannel(guild, channel.id)) {
+			const error = new Error('Discord no confirmo el movimiento al canal '+channel.id);
+			error.code = 'VOICE_CHANNEL_TIMEOUT';
+			throw error;
+		}
+		console.log('['+guild.name+'] MOVED --> '+channel.id+' ('+channel.name+')');
+	}
+
+	guild_voice[guild.id] = current_connection;
+	return current_connection;
 }
 function waitForVoiceDisconnect(guildId, timeoutMs = 4_000) {
 	return new Promise((resolve) => {
@@ -248,6 +346,7 @@ function waitForVoiceDisconnect(guildId, timeoutMs = 4_000) {
 async function leaveChannel(guildId, connection = getVoiceConnection(guildId)) {
 	if (!connection || connection.state.status === VoiceConnectionStatus.Destroyed) return false;
 
+	stopActiveAudio(guildId);
 	intentionalDisconnects.add(connection);
 	const confirmation = waitForVoiceDisconnect(guildId);
 	connection.disconnect();
@@ -259,25 +358,88 @@ async function leaveChannel(guildId, connection = getVoiceConnection(guildId)) {
 	return confirmed;
 }
 
+function syncBotVoiceState(oldState, newState) {
+	const guild = newState.guild || oldState.guild;
+	const guildId = guild.id;
+	const oldChannelId = oldState.channelId;
+	const newChannelId = newState.channelId;
+	const connection = getVoiceConnection(guildId);
+
+	if (newChannelId === null) {
+		console.log('['+guild.name+'] Bot desconectado de voz'+
+			(oldChannelId ? ' desde '+oldChannelId : ''));
+		stopActiveAudio(guildId);
+
+		// Si Discord o un administrador nos desconecto, elimina tambien la
+		// conexion registrada por @discordjs/voice. De lo contrario, el siguiente
+		// join puede reutilizar una conexion obsoleta que aun recuerda el canal.
+		if (connection && connection.state.status !== VoiceConnectionStatus.Destroyed) {
+			intentionalDisconnects.add(connection);
+			connection.destroy();
+		}
+		guild_voice[guildId] = null;
+		return;
+	}
+
+	if (!connection || connection.state.status === VoiceConnectionStatus.Destroyed) {
+		guild_voice[guildId] = null;
+		console.warn('['+guild.name+'] Discord ubico al bot en '+newChannelId+
+			', pero no existe una conexion de voz activa');
+		return;
+	}
+
+	// @discordjs/voice normalmente actualiza joinConfig con el mismo evento.
+	// Se sincroniza explicitamente para que joinChannel siempre compare contra
+	// el canal real incluso cuando un administrador movio al bot manualmente.
+	connection.joinConfig.channelId = newChannelId;
+	guild_voice[guildId] = connection;
+
+	if (oldChannelId !== newChannelId) {
+		console.log('['+guild.name+'] Bot movido: '+(oldChannelId || 'desconectado')+
+			' -> '+newChannelId);
+	}
+}
+
+async function getReadyVoiceConnection(guild, channel) {
+	for (let attempt = 1; attempt <= 2; attempt++) {
+		let connection;
+		try {
+			connection = await joinChannel(guild, channel);
+			if (!connection) throw new Error('No existe una conexion de voz activa');
+			await entersState(connection, VoiceConnectionStatus.Ready, 20_000);
+			return connection;
+		} catch (error) {
+			const retryable = error?.code === 'ABORT_ERR' || error?.code === 'VOICE_CHANNEL_TIMEOUT';
+			if (!retryable || attempt === 2) throw error;
+			console.warn('['+guild.name+'] La conexion de voz no estuvo lista a tiempo; reintentando...');
+			const staleConnection = connection || getVoiceConnection(guild.id);
+			if (staleConnection) await leaveChannel(guild.id, staleConnection);
+		}
+	}
+}
+
 async function audioQueueChannel(guild,channelId) {
 	const toPlay = guild_voice_queue[guild.id][channelId].shift();
 	if (toPlay!==undefined) {
 		try {
-			await joinChannel(toPlay.guild,toPlay.channel);
-			const connection = guild_voice[toPlay.guild.id];
-			if (!connection) throw new Error('No existe una conexion de voz activa');
-			await entersState(connection, VoiceConnectionStatus.Ready, 20_000);
+			const connection = await getReadyVoiceConnection(toPlay.guild, toPlay.channel);
 			await new Promise((resolve, reject) => {
+				// Una conexion puede dejar de ser reproducible durante unos milisegundos
+				// al cambiar de canal. Pausar conserva el saludo hasta que vuelva a Ready.
 				const audioPlayer = createAudioPlayer({ behaviors: { noSubscriber: NoSubscriberBehavior.Pause } });
 				let finished = false;
 				const finish = (error) => {
 					if (finished) return;
 					finished = true;
+					if (activeAudioPlayers.get(toPlay.guild.id) === audioPlayer) {
+						activeAudioPlayers.delete(toPlay.guild.id);
+					}
 					audioPlayer.stop(true);
 					error ? reject(error) : resolve();
 				};
 				audioPlayer.once(AudioPlayerStatus.Idle, () => finish());
 				audioPlayer.once('error', finish);
+				activeAudioPlayers.set(toPlay.guild.id, audioPlayer);
 				connection.subscribe(audioPlayer);
 				audioPlayer.play(createAudioResource(toPlay.sound));
 				console.log('['+toPlay.guild.name+'] '+connection.joinConfig.channelId+' Playing: '+toPlay.sound);
@@ -389,21 +551,18 @@ async function notifyChannel(guild,channel,member,type) {
 						saludo = nickname;
 					}
 			}
-			playSound(guild,channel,sonido);
 			if (saludo!=='') {
-				if (member.user.id=='692165447998636214') { //JB Network
-					var saludoFile = await GeneraVoz('el pinche muñecazo acaba de conectarse');
+				const textoSaludo = ['692165447998636214', '994747188208992348'].includes(member.user.id)
+					? 'el pinche muñecazo acaba de conectarse'
+					: saludo;
+				var saludoFile = await GeneraVoz(textoSaludo);
+				const saludoCombinado = await CombinaAudios(sonido, saludoFile);
+				if (saludoCombinado) playSound(guild,channel,saludoCombinado);
+				else {
+					playSound(guild,channel,sonido);
 					playSound(guild,channel,saludoFile);
-				} else {
-					if (member.user.id=='994747188208992348') { //JB Network
-						var saludoFile = await GeneraVoz('el pinche muñecazo acaba de conectarse');
-						playSound(guild,channel,saludoFile);
-					} else {
-						var saludoFile = await GeneraVoz(saludo);
-						playSound(guild,channel,saludoFile);
-					}
 				}
-			}
+			} else playSound(guild,channel,sonido);
 			break;
 		case 'leave':
 			console.log('['+guild.name+'] '+nickname+' LEFT '+channel.id+' ('+channel.name+')');
@@ -425,11 +584,15 @@ async function notifyChannel(guild,channel,member,type) {
 						saludo = nickname;
 					}
 			}
-			playSound(guild,channel,sonido);
 			if (saludo!=='') {
 				var saludoFile = await GeneraVoz(saludo);
-				playSound(guild,channel,saludoFile);
-			}
+				const despedidaCombinada = await CombinaAudios(sonido, saludoFile);
+				if (despedidaCombinada) playSound(guild,channel,despedidaCombinada);
+				else {
+					playSound(guild,channel,sonido);
+					playSound(guild,channel,saludoFile);
+				}
+			} else playSound(guild,channel,sonido);
 			break;
 		case 'serverdeaf':
 			console.log('['+guild.name+'] '+nickname+' Server Deafened '+channel.id+' ('+channel.name+')');
@@ -709,10 +872,16 @@ client.on(Events.ClientReady, async () => {
 	}
 	
 });
-client.on('voiceStateUpdate', async (oldState, newState) => {
+client.on(Events.VoiceStateUpdate, async (oldState, newState) => {
 	//console.log('oldState',util.inspect(oldState, {showHidden: false, depth: 0}));
 	//console.log('newState',util.inspect(newState, {showHidden: false, depth: 0}));
-	if (!guilds[newState.guild.id].enabled) {
+	// El estado del propio bot debe sincronizarse incluso si las notificaciones
+	// del servidor estan apagadas.
+	if (newState.id === client.user.id) {
+		syncBotVoiceState(oldState, newState);
+		return;
+	}
+	if (!guilds[newState.guild.id]?.enabled) {
 		//estamos apagados no hay que hacer nada
 		return false;
 	}
@@ -802,7 +971,11 @@ client.on('interactionCreate', async interaction => {
 	const comando = client.commands.get(interaction.commandName);
 	if (!comando) return;
 	try {
-		await comando.execute(interaction);
+		await comando.execute(interaction, {
+			GeneraVoz,
+			playSound,
+			guilds,
+		});
 	} catch (error) {
 		console.error(error);
 		const response = { content: 'Ocurrio un error al ejecutar el comando', ephemeral: true };
@@ -940,10 +1113,61 @@ client.ws.on('INTERACTION_CREATEX', async interaction => {
 		}
 	});
 });
+let commandConsole = null;
+let commandInputActive = false;
+let promptAwareConsoleInstalled = false;
 let shutdownPromise = null;
+
+function installPromptAwareConsole() {
+	if (promptAwareConsoleInstalled) return;
+	promptAwareConsoleInstalled = true;
+
+	for (const method of consoleMethodNames) {
+		console[method] = (...args) => {
+			const activeConsole = commandConsole;
+			if (activeConsole) {
+				readline.clearLine(activeConsole.output, 0);
+				readline.cursorTo(activeConsole.output, 0);
+			}
+
+			originalConsoleMethods[method](...args);
+
+			if (activeConsole && activeConsole === commandConsole &&
+				!commandInputActive && !shutdownPromise) {
+				activeConsole.prompt(true);
+			}
+		};
+	}
+}
+
+function restoreConsole() {
+	if (!promptAwareConsoleInstalled) return;
+	for (const method of consoleMethodNames) console[method] = originalConsoleMethods[method];
+	promptAwareConsoleInstalled = false;
+}
+
+function printConsoleHelp() {
+	const currentYear = new Date().getFullYear();
+	const version = Array.isArray(config.version) ? config.version.join('.') : String(config.version || 'desconocida');
+	console.log([
+		'Burbuja (c) Hidalgo Rionda 2018-'+currentYear,
+		'Version: '+version,
+		'',
+		'Comandos disponibles:',
+		'  help  Muestra esta ayuda y la version del bot.',
+		'  exit  Cierra ordenadamente el bot y sus conexiones.',
+		'  quit  Alias de exit; cierra ordenadamente el bot.',
+	].join('\n'));
+}
+
 async function shutdown(signal) {
 	if (shutdownPromise) return shutdownPromise;
 	shutdownPromise = (async () => {
+		if (commandConsole) {
+			commandConsole.close();
+			commandConsole = null;
+		}
+		restoreConsole();
 		console.log('Recibida señal '+signal+'. Cerrando conexiones...');
 		const activeConnections = [...getVoiceConnections().entries()]
 			.filter(([, connection]) => connection.state.status !== VoiceConnectionStatus.Destroyed);
@@ -967,9 +1191,49 @@ async function shutdown(signal) {
 	return shutdownPromise;
 }
 
+function startCommandConsole() {
+	if (!process.stdin.isTTY || !process.stdout.isTTY) return;
+
+	commandConsole = readline.createInterface({
+		input: process.stdin,
+		output: process.stdout,
+		prompt: 'burbuja> ',
+	});
+
+	console.log('Consola lista. Escribe help para ver los comandos disponibles.');
+	commandConsole.prompt();
+	installPromptAwareConsole();
+	commandConsole.on('line', (input) => {
+		const command = input.trim().toLowerCase();
+		let shouldPrompt = true;
+		commandInputActive = true;
+		try {
+			switch (command) {
+				case 'exit':
+				case 'quit':
+					shouldPrompt = false;
+					void shutdown('comando '+command);
+					break;
+				case 'help':
+					printConsoleHelp();
+					break;
+				case '':
+					break;
+				default:
+					console.log('Comando desconocido: '+command+'. Escribe help.');
+			}
+		} finally {
+			commandInputActive = false;
+			if (shouldPrompt && commandConsole && !shutdownPromise) commandConsole.prompt();
+		}
+	});
+	commandConsole.on('SIGINT', () => void shutdown('SIGINT'));
+}
+
 process.once('SIGINT', () => void shutdown('SIGINT'));
 process.once('SIGTERM', () => void shutdown('SIGTERM'));
 
 console.log('Start...'); 
+startCommandConsole();
 
 client.login(config.Token).catch(error => {console.log(error); console.log('reconnect');});
